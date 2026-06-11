@@ -21,4 +21,6 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Run processor tests
-        run: ./gradlew :processor:test
+        run: |
+          chmod +x ./gradlew
+          ./gradlew :processor:test
