@@ -44,7 +44,10 @@ class IntegratedTests : BaseProcessorTest() {
         assertTrue(wrapperCode.contains("toJson1()"))
         assertTrue(wrapperCode.contains("ids: Array<Long>"), "Set<Long> should become Array<Long> in BigInt mode")
         assertTrue(wrapperCode.contains("ids.toSet()"))
-        assertTrue(wrapperCode.contains("Promise<Array<Long>>"), "Suspend Set<Long> return should become Promise<Array<Long>> in BigInt mode")
+        assertTrue(
+            wrapperCode.contains("Promise<Array<Long>>"),
+            "Suspend Set<Long> return should become Promise<Array<Long>> in BigInt mode",
+        )
         assertTrue(wrapperCode.contains("scope.promise"))
     }
 
@@ -93,7 +96,10 @@ class IntegratedTests : BaseProcessorTest() {
 
         val suspendWrapper = generatedFiles.single { it.name == "SuspendLongServiceJs.kt" }.readText()
         assertTrue(suspendWrapper.contains("private val scope: CoroutineScope = MainScope()"))
-        assertTrue(suspendWrapper.contains("Promise<Array<Long>>"), "Suspend Set<Long> should become Promise<Array<Long>> in BigInt mode")
+        assertTrue(
+            suspendWrapper.contains("Promise<Array<Long>>"),
+            "Suspend Set<Long> should become Promise<Array<Long>> in BigInt mode",
+        )
         assertTrue(suspendWrapper.contains("ids.toSet()"))
         assertTrue(suspendWrapper.contains("payload: Json"))
         assertTrue(suspendWrapper.contains("toMap2()"))

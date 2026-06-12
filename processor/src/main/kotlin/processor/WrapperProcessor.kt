@@ -78,9 +78,16 @@ class WrapperProcessor(
                 )
         }
 
+        // Top-level functions have no enclosing class and are gathered into a single JsExportUtils
+        // object; member functions are grouped under their declaring class.
+        val standaloneFunctions = mutableListOf<KSFunctionDeclaration>()
+
         functions.forEach { function ->
-            (function.parentDeclaration as? KSClassDeclaration)?.let { classDecl ->
+            val classDecl = function.parentDeclaration as? KSClassDeclaration
+            if (classDecl != null) {
                 functionsByClass.getOrPut(classDecl) { mutableListOf() }.add(function)
+            } else {
+                standaloneFunctions.add(function)
             }
         }
 
@@ -90,6 +97,12 @@ class WrapperProcessor(
 
         functionsByClass.forEach { (classDecl, funcs) ->
             generateWrapper(classDecl, funcs.distinct())
+        }
+
+        if (standaloneFunctions.isNotEmpty()) {
+            val distinct = standaloneFunctions.distinct()
+            ManglingHandler.checkConflicts(null, distinct, logger)
+            generateUtils(distinct)
         }
 
         if (mapHandler.hasConversions()) {
@@ -153,49 +166,19 @@ class WrapperProcessor(
             )
         }
 
+        val leadingParams = valueClassSelf?.let { (name, mapping) -> listOf(ParameterSpec(name, mapping.jsTypeName)) } ?: emptyList()
+
         functions.forEach { func ->
-            val exportedName = ManglingHandler.getExportedName(func)
             val originalName = func.simpleName.asString()
-            val isSuspend = func.modifiers.contains(Modifier.SUSPEND)
-
-            val returnMapping = resolveMapping(func.returnType!!.resolve())
-            val finalReturn: TypeName = if (isSuspend) SuspendHandler.buildReturnType(returnMapping) else returnMapping.jsTypeName
-
-            val selfParam: ParameterSpec? = valueClassSelf?.let { (name, mapping) ->
-                ParameterSpec(name, mapping.jsTypeName)
-            }
-
-            val params = func.parameters.map {
-                val mapping = resolveMapping(it.type.resolve())
-                ParameterSpec(it.name!!.asString(), mapping.jsTypeName)
-            }
-
-            val allParams = if (selfParam != null) listOf(selfParam) + params else params
-
-            val args = func.parameters.joinToString(", ") {
-                resolveMapping(it.type.resolve()).toKotlin(it.name!!.asString())
-            }
-
-            val receiver = if (valueClassSelf != null) {
-                val (selfName, selfMapping) = valueClassSelf
-                "${serviceClass.simpleName.asString()}(${selfMapping.toKotlin(selfName)})"
-            } else {
-                "service"
-            }
-
-            val call = "$receiver.$originalName($args)"
-            val body = if (isSuspend) {
-                SuspendHandler.buildBody(call, returnMapping)
-            } else {
-                "return ${returnMapping.fromKotlin(call)}"
-            }
-
             classBuilder.addFunction(
-                FunSpec.builder(exportedName)
-                    .addParameters(allParams)
-                    .returns(finalReturn)
-                    .addStatement(body)
-                    .build(),
+                buildExportedFunction(func, leadingParams) { args ->
+                    if (valueClassSelf != null) {
+                        val (selfName, selfMapping) = valueClassSelf
+                        "${serviceClass.simpleName.asString()}(${selfMapping.toKotlin(selfName)}).$originalName($args)"
+                    } else {
+                        "service.$originalName($args)"
+                    }
+                },
             )
         }
 
@@ -214,6 +197,99 @@ class WrapperProcessor(
             .addType(classBuilder.build())
             .build()
             .writeTo(codeGenerator, aggregating = false)
+    }
+
+    /**
+     * Generates the shared `JsExportUtils` object for top-level [functions] annotated with
+     * [annotations.JsExportFunction]. Unlike [generateWrapper] there is no `service` instance:
+     * each function delegates to the original top-level function directly, importing it from its
+     * source package. All standalone functions across every source file land in this one object.
+     */
+    private fun generateUtils(functions: List<KSFunctionDeclaration>) {
+        pendingImports.clear()
+        val wrapperName = "JsExportUtils"
+
+        val classBuilder = TypeSpec
+            .objectBuilder(wrapperName)
+            .addAnnotation(ClassName("kotlin.js", "JsExport"))
+            .addAnnotation(
+                AnnotationSpec.builder(ClassName("kotlin", "OptIn"))
+                    .addMember("%T::class", ClassName("kotlin.js", "ExperimentalJsExport"))
+                    .build(),
+            )
+
+        if (SuspendHandler.needsScope(functions)) {
+            classBuilder.addProperty(
+                PropertySpec
+                    .builder("scope", ClassName("kotlinx.coroutines", "CoroutineScope"), KModifier.PRIVATE)
+                    .initializer("%T()", ClassName("kotlinx.coroutines", "MainScope"))
+                    .build(),
+            )
+        }
+
+        functions.forEach { func ->
+            val originalName = func.simpleName.asString()
+            // Import the top-level function so the unqualified call resolves in the generated file.
+            val packageName = func.packageName.asString()
+            if (packageName.isNotEmpty()) pendingImports.add(ClassName(packageName, originalName))
+
+            classBuilder.addFunction(
+                buildExportedFunction(func) { args -> "$originalName($args)" },
+            )
+        }
+
+        val fileSpec = FileSpec.builder("", wrapperName)
+            .addImport("", "toMap", "toJson")
+            .addImport("kotlin.js", "Json")
+            .addImport("kotlinx.coroutines", "promise")
+
+        pendingImports.forEach { className ->
+            if (className.packageName.isNotEmpty()) {
+                fileSpec.addImport(className.packageName, className.simpleName)
+            }
+        }
+
+        fileSpec
+            .addType(classBuilder.build())
+            .build()
+            .writeTo(codeGenerator, aggregating = false)
+    }
+
+    /**
+     * Builds the exported [FunSpec] for [func], shared by class wrappers and `JsExportUtils`.
+     *
+     * Parameter and return types are resolved to their JS-compatible forms, suspend functions are
+     * wrapped in `Promise`, and [leadingParams] are prepended to the function's own parameters
+     * (used to expose a value class's underlying value as an implicit first argument).
+     *
+     * [buildCall] receives the comma-joined, already-converted argument list and returns the Kotlin
+     * delegation expression, e.g. `service.foo(args)`, `Score(score).foo(args)`, or `foo(args)`.
+     */
+    private fun buildExportedFunction(
+        func: KSFunctionDeclaration,
+        leadingParams: List<ParameterSpec> = emptyList(),
+        buildCall: (args: String) -> String,
+    ): FunSpec {
+        val isSuspend = func.modifiers.contains(Modifier.SUSPEND)
+        val returnMapping = resolveMapping(func.returnType!!.resolve())
+        val finalReturn: TypeName = if (isSuspend) SuspendHandler.buildReturnType(returnMapping) else returnMapping.jsTypeName
+
+        val params = func.parameters.map {
+            ParameterSpec(it.name!!.asString(), resolveMapping(it.type.resolve()).jsTypeName)
+        }
+
+        val args = func.parameters.joinToString(", ") {
+            resolveMapping(it.type.resolve()).toKotlin(it.name!!.asString())
+        }
+
+        val call = buildCall(args)
+        val body = if (isSuspend) SuspendHandler.buildBody(call, returnMapping) else "return ${returnMapping.fromKotlin(call)}"
+
+        return FunSpec.builder(ManglingHandler.getExportedName(func))
+            .addParameters(leadingParams + params)
+            .returns(finalReturn)
+            .addStatement(body)
+            .build()
     }
 
     /**

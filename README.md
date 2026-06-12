@@ -1,6 +1,6 @@
 # KotlinToJS
 
-A KSP processor for **Kotlin Multiplatform** projects that solves the limitations of `@JsExport` by generating type-safe JavaScript wrapper classes automatically — no manual conversion code, no fighting the compiler.
+A KSP processor for **Kotlin Multiplatform** projects that generates JavaScript wrapper classes for types `@JsExport` does not support. It removes the conversion code otherwise written by hand at the export boundary.
 
 ## Table Of Contents
 
@@ -17,8 +17,8 @@ A KSP processor for **Kotlin Multiplatform** projects that solves the limitation
   - [Long](#long)
   - [Value classes](#value-classes)
   - [Interface](#interface)
-    - [Solution - Using Implementation class](#solution---using-implementation-class)
-    - [Solution - Using Expect-Actual](#solution---using-expect-actual)
+    - [Solution-Using Implementation class](#solution-using-implementation-class)
+    - [Solution-Using Expect-Actual](#solution-using-expect-actual)
   - [Enum](#enum)
   - [Sealed classes](#sealed-classes)
   - [Code mangling](#code-mangling)
@@ -28,7 +28,7 @@ A KSP processor for **Kotlin Multiplatform** projects that solves the limitation
 
 ## Getting Started
 
-This plugin is designed for **Kotlin Multiplatform (KMP)** projects that expose a JavaScript target. The KSP processor runs only during the JS compilation and generates the `@JsExport` wrappers from your shared or JS-specific source sets.
+This plugin targets **Kotlin Multiplatform (KMP)** projects that expose a JavaScript target. The KSP processor runs during the JS compilation and generates the `@JsExport` wrappers from the common or JS source sets.
 
 ### Installation
 
@@ -65,16 +65,16 @@ kotlin {
 }
 
 dependencies {
-    // Processor runs on the JS target only — other targets are unaffected
+    // Processor runs on the JS target only. Other targets are unaffected
     add("kspJs", "pt.kotlintojs:processor:<version>")
 }
 ```
 
-The `@JsExportClass` and `@JsExportFunction` annotations can live in either `commonMain` (if you want to annotate shared code) or `jsMain` (JS-only classes). The processor only runs for the JS compilation regardless of where the annotations are placed.
+The `@JsExportClass` and `@JsExportFunction` annotations can be placed in `commonMain` or `jsMain`. The processor runs for the JS compilation regardless of where the annotations are placed.
 
 ### Where does generated code go?
 
-KSP writes the generated `.kt` files to `build/generated/ksp/` and **automatically adds that directory to the JS compilation source set**. You do not need to configure any `srcDir`.
+KSP writes the generated `.kt` files to `build/generated/ksp/` and **adds that directory to the JS compilation source set**. You do not need to configure any `srcDir`.
 
 After `./gradlew build`, find the generated wrappers at:
 
@@ -82,9 +82,9 @@ After `./gradlew build`, find the generated wrappers at:
 build/generated/ksp/js/jsMain/kotlin/
 ```
 
-IntelliJ IDEA and Android Studio index this directory automatically, so **Go to Declaration** and **Find Usages** navigate into generated files.
+IntelliJ IDEA and Android Studio index this directory, so **Go to Declaration** and **Find Usages** navigate into generated files.
 
-> If the IDE does not pick up the directory, add it manually to `jsMain`:
+> If the IDE does not pick up the directory, add it to `jsMain`:
 > ```kotlin
 > kotlin {
 >     sourceSets {
@@ -95,10 +95,10 @@ IntelliJ IDEA and Android Studio index this directory automatically, so **Go to 
 
 ### Plugin configuration
 
-The `ksp { }` block is a **top-level** block in `build.gradle.kts` — outside `kotlin { }` and `dependencies { }`. Options here apply to all KSP processors in the project:
+The `ksp { }` block is a **top-level** block in `build.gradle.kts`, outside `kotlin { }` and `dependencies { }`. Options here apply to all KSP processors in the project:
 
 ```kotlin
-// build.gradle.kts  —  top level
+// build.gradle.kts, top level
 ksp {
     arg("longAsBigInt", "true")   // required only when Long appears at export boundaries
 }
@@ -149,23 +149,21 @@ If you currently have a custom KSP processor generating `@JsExport` wrappers:
 1. Remove the existing processor from your `add("kspJs", ...)` dependencies.
 2. Add `add("kspJs", "pt.kotlintojs:processor:<version>")` instead, and `implementation("pt.kotlintojs:annotations:<version>")` to `commonMain` (or `jsMain`).
 3. Replace your custom annotations with `@JsExportClass` (entire class) or `@JsExportFunction` (single method).
-4. Remove manual `@JsName` disambiguation — the plugin detects overloading conflicts and fails the build with a clear message when `@JsName` is missing, instead of silently generating broken names.
+4. Remove manual `@JsName` disambiguation. The plugin detects overload conflicts and fails the build when `@JsName` is missing, instead of generating mangled names.
 
-The generated output is a `{OriginalName}Js` object in the same package as the source class, written to the same KSP output directory your build already knows about.
+The generated output is a `{OriginalName}Js` object in the same package as the source class, written to the KSP output directory.
 
 ---
 
 ## Usage
 
-Add annotations to your existing Kotlin classes:
-
-Annotate your classes and functions:
+Annotate classes and functions:
 
 ```kotlin
 import annotations.JsExportClass
 import annotations.JsExportFunction
 
-// Wraps the entire class — all public functions are exported
+// Wraps the entire class. All public functions are exported
 @JsExportClass
 class UserService {
     fun getUser(id: String): String = "user-$id"
@@ -183,20 +181,20 @@ class OrderService {
 fun greet(name: String): String = "Hello, $name"
 ```
 
-The plugin generates a `UserServiceJs` object (and a `JsExportUtils` object for standalone functions) with all the JS-compatible type conversions handled automatically.
+The plugin generates a `UserServiceJs` object, and a `JsExportUtils` object for standalone functions, with the type conversions applied.
 
 ### @ExperimentalJsExport vs @JsExport
 
-Kotlin's built-in `@JsExport` requires opting into `@ExperimentalJsExport` on every declaration, because the API is still evolving and several common Kotlin types are not supported at the export boundary.
+Kotlin's `@JsExport` requires opting into `@ExperimentalJsExport` on every declaration. Several Kotlin types are not supported at the export boundary.
 
-This plugin takes a different approach: you annotate your existing Kotlin code with `@JsExportClass` or `@JsExportFunction`, and the processor generates a separate `*Js` wrapper object that carries the `@JsExport` + `@OptIn(ExperimentalJsExport::class)` pair itself. Your domain code stays clean, and the generated wrapper handles all the unsafe surface.
+With this plugin you annotate Kotlin code with `@JsExportClass` or `@JsExportFunction`. The processor generates a separate `*Js` wrapper object that carries the `@JsExport` and `@OptIn(ExperimentalJsExport::class)` annotations. The source class keeps no JS annotations.
 
 |                         | `@JsExport`                                     | This plugin                                                                                |
 |-------------------------|-------------------------------------------------|--------------------------------------------------------------------------------------------|
 | Annotation on your code | `@JsExport @OptIn(ExperimentalJsExport::class)` | `@JsExportClass` / `@JsExportFunction`                                                     |
 | Collections             | Manual conversion required                      | Automatic (`List`/`Set` → `Array`, `Map` → `Json`)                                         |
 | `Long`                  | Unusable (opaque JS object) or precision loss   | Warning + `Double` fallback, or native BigInt passthrough (opt-in)                         |
-| Value classes           | Opaque wrapper exposed to JS                    | Unwrap to underlying type; or annotate the value class directly for static method wrappers |
+| Value classes           | Opaque wrapper exposed to JS                    | Unwrap to underlying type, or annotate the value class directly for static method wrappers |
 | Suspend functions       | Manual `Promise` wrapping required              | Automatic                                                                                  |
 | Code mangling           | Manual `@JsName` everywhere                     | Conflict detection + `@JsName` passthrough                                                 |
 
@@ -204,16 +202,16 @@ This plugin takes a different approach: you annotate your existing Kotlin code w
 
 ## Limitations
 
-The following sections describe known Kotlin/JS limitations when using `@JsExport` directly, and how this plugin addresses each one. For deeper background, see the [Touchlab @JsExport guide](https://dev.to/touchlab/jsexport-guide-for-exposing-kotlin-to-js-20l9).
+The following sections describe Kotlin/JS limitations when using `@JsExport` directly, and how this plugin handles each one. For more detail, see the [Touchlab @JsExport guide](https://dev.to/touchlab/jsexport-guide-for-exposing-kotlin-to-js-20l9).
 
 ### Collections
 
-Kotlin collections (`List`, `Set`, `Map`) are not supported at `@JsExport` boundaries. Attempting to export them directly results in a compiler warning or error, and the resulting JS types are not usable.
+Kotlin collections (`List`, `Set`, `Map`) are not supported at `@JsExport` boundaries. Exporting them directly produces a compiler warning or error, and the resulting JS types are not usable.
 
 **Problem with raw `@JsExport`:**
 
 ```kotlin
-@JsExport // compiler error — List is not exportable
+@JsExport // compiler error: List is not exportable
 fun getItems(): List<String> = listOf("a", "b")
 ```
 
@@ -250,13 +248,13 @@ object ItemServiceJs {
 }
 ```
 
-For `Map` types, a `TypeConversion.kt` file is also generated with the corresponding `toJson` / `toMap` extension functions.
+For `Map` types, a `TypeConversion.kt` file is also generated with the `toJson` / `toMap` extension functions.
 
 ---
 
 ### Long
 
-JavaScript has no native 64-bit integer type. Kotlin's `Long` compiles to a special runtime class in JS that is opaque and unusable from JavaScript code directly. Converting it to `Double` loses precision for integers above 2^53 — the plugin warns about this instead of doing it silently.
+JavaScript has no native 64-bit integer type. Kotlin's `Long` compiles to a runtime class in JS that JavaScript code cannot use as a number. Converting it to `Double` loses precision for integers above 2^53. The plugin reports this instead of converting silently.
 
 **Problem with raw `@JsExport`:**
 
@@ -267,7 +265,7 @@ fun getUserId(): Long = 42L // JS receives an opaque Kotlin Long object, not a n
 
 **What this plugin does:**
 
-When `Long` appears at a direct `@JsExport` boundary, the plugin emits a **build warning** and falls back to a `Double` conversion (safe for integers up to 2^53):
+When `Long` appears at a direct `@JsExport` boundary, the plugin emits a **build warning** and falls back to a `Double` conversion (valid for integers up to 2^53):
 
 ```
 warning: Long is not supported at @JsExport boundaries without precision loss.
@@ -275,9 +273,9 @@ Enable BigInt support: add "-Xes-long-as-bigint" to your Kotlin/JS target's
 freeCompilerArgs and set ksp { arg("longAsBigInt", "true") } in your build file.
 ```
 
-The build still succeeds — if your values fit in 53 bits, the `Double` fallback is perfectly usable. For full 64-bit precision, enable BigInt mode below.
+The build still succeeds. If your values fit in 53 bits, the `Double` fallback works. For 64-bit precision, enable BigInt mode below.
 
-**Solution — enable BigInt support:**
+**Enable BigInt support:**
 
 Add the compiler flag and the plugin option to your `build.gradle.kts`:
 
@@ -299,7 +297,7 @@ ksp {
 }
 ```
 
-With both options set, `Long` passes through the wrapper boundary unchanged. Kotlin/JS compiles it to the native JS `BigInt` type:
+BigInt output requires an ES2015 target, so the JS target must compile to ES2015. With both options set, `Long` passes through the wrapper boundary unchanged and Kotlin/JS compiles it to the native JS `BigInt` type:
 
 ```kotlin
 @JsExportClass
@@ -320,7 +318,7 @@ fun findUser(id: Long): String = service.findUser(id)
 
 ### Value classes
 
-Kotlin value (inline) classes are not directly exportable to JavaScript. The class wrapper disappears at runtime and the raw underlying representation is what JS sees — but the generated TypeScript definition still refers to the value class type, which JS cannot construct.
+Kotlin value (inline) classes are not directly exportable to JavaScript. The class wrapper disappears at runtime and JS sees the underlying representation, but the generated TypeScript definition still refers to the value class type, which JS cannot construct.
 
 **Problem with raw `@JsExport`:**
 
@@ -333,11 +331,11 @@ fun getUser(id: UserId): String = "user-${id.value}"
 // d.ts says `UserId`, but JS has no way to create one
 ```
 
-This plugin handles value classes in two complementary ways, depending on where the annotation is placed.
+This plugin handles value classes in two ways, depending on where the annotation is placed.
 
-#### Scenario 1 — value class as a parameter/return type
+#### Scenario 1: value class as a parameter or return type
 
-Annotate the *service class* that uses the value class. The plugin unwraps the value class at the JS boundary and re-wraps it transparently before calling into the service:
+Annotate the service class that uses the value class. The plugin unwraps the value class at the JS boundary and re-wraps it before calling the service:
 
 ```kotlin
 @JvmInline value class UserId(val value: String)
@@ -356,9 +354,9 @@ fun getUser(id: String): String = service.getUser(UserId(id))
 fun createUser(): String = service.createUser().value
 ```
 
-#### Scenario 2 — annotate the value class itself
+#### Scenario 2: annotate the value class itself
 
-Annotate the value class directly with `@JsExportClass`. The plugin generates a `*Js` companion object where each method of the value class becomes a **static function** that takes the underlying type as its first argument:
+Annotate the value class directly with `@JsExportClass`. The plugin generates a `*Js` object where each method becomes a static function that takes the underlying value as its first argument:
 
 ```kotlin
 @JvmInline
@@ -380,9 +378,9 @@ object ScoreJs {
 }
 ```
 
-The first parameter is named after the class (lower-camel-cased). JS consumers call `ScoreJs.doubled(10)` instead of needing to construct a Kotlin `Score` object.
+The first parameter is named after the class, lower-camel-cased. JS callers invoke `ScoreJs.doubled(10)` without constructing a Kotlin `Score` object.
 
-Type conversions on the underlying property compose transitively in both scenarios. A `value class BigId(val id: Long)` in BigInt mode exposes `Long` at the boundary; a `value class Price(val cents: Int)` exposes `Int`.
+Type conversions on the underlying property compose in both scenarios. A `value class BigId(val id: Long)` in BigInt mode exposes `Long` at the boundary. A `value class Price(val cents: Int)` exposes `Int`.
 
 > **Known limitation:** value classes used as element types inside `List<MyValueClass>` or
 > `Set<MyValueClass>` are not yet unwrapped by the collection handler. Only direct parameter
@@ -392,11 +390,11 @@ Type conversions on the underlying property compose transitively in both scenari
 
 ### Interface
 
-Kotlin interfaces cannot be directly exported with `@JsExport` in a meaningful way — the generated JS does not expose the interface in a consumable form, and implementations can't be used from JS either.
+Kotlin interfaces cannot be exported with `@JsExport`. The generated JS does not expose the interface in a usable form, and implementations cannot be used from JS.
 
-#### Solution - Using Implementation class
+#### Solution-Using Implementation class
 
-The recommended approach is to annotate the concrete implementation class rather than the interface. The plugin generates a wrapper for the implementation.
+Annotate the implementation class instead of the interface. The plugin generates a wrapper for the implementation.
 
 ```kotlin
 interface Repository {
@@ -409,9 +407,9 @@ class UserRepository : Repository {
 }
 ```
 
-The generated `UserRepositoryJs` wraps `UserRepository` directly, with all type conversions applied.
+The generated `UserRepositoryJs` wraps `UserRepository`, with type conversions applied.
 
-#### Solution - Using Expect-Actual
+#### Solution-Using Expect-Actual
 
 In a KMP project, you can declare the interface in `commonMain` and provide a JS-specific implementation in `jsMain` annotated with `@JsExportClass`:
 
@@ -430,22 +428,22 @@ actual class AnalyticsServiceImpl : AnalyticsService {
 }
 ```
 
-The plugin processes the `jsMain` actual class and generates the wrapper with the correct `Map → Json` conversion.
+The plugin processes the `jsMain` actual class and generates the wrapper with the `Map → Json` conversion.
 
 ---
 
 ### Enum
 
-Kotlin enums exported with `@JsExport` produce JavaScript objects with complex internal structure (`$ordinal`, `$name`, companion object entries) that are difficult to consume idiomatically from JS.
+Kotlin enums exported with `@JsExport` produce JavaScript objects with internal fields (`$ordinal`, `$name`, companion object entries) that JS cannot consume directly.
 
 ```kotlin
 @JsExport
-enum class Status { ACTIVE, INACTIVE } // JS receives an opaque enum class, not a simple string/number
+enum class Status { ACTIVE, INACTIVE } // JS receives an opaque enum class, not a string or number
 ```
 
 **Workaround with this plugin:**
 
-Annotate a wrapper class that exposes the enum values as plain JS-friendly types:
+Annotate a wrapper class that exposes the enum values as strings:
 
 ```kotlin
 enum class Status { ACTIVE, INACTIVE }
@@ -457,7 +455,7 @@ class StatusService {
 }
 ```
 
-The plugin wraps `StatusService` and exposes the enum as plain strings, which JS can work with naturally.
+The plugin wraps `StatusService` and exposes the enum as strings.
 
 > Full enum support (auto-generating string/ordinal accessors) is planned for a future release.
 
@@ -465,7 +463,7 @@ The plugin wraps `StatusService` and exposes the enum as plain strings, which JS
 
 ### Sealed classes
 
-Sealed classes present similar challenges to enums when exported directly — the generated JS type hierarchy is verbose and requires knowledge of Kotlin's internal class naming.
+Sealed classes have the same problem as enums when exported directly. The generated JS type hierarchy requires knowledge of Kotlin's internal class naming.
 
 ```kotlin
 @JsExport
@@ -495,7 +493,7 @@ class ResultService {
 }
 ```
 
-Alternatively, expose a JS-friendly discriminated union using `Json`:
+Alternatively, expose a discriminated union using `Json`:
 
 ```kotlin
 @JsExportClass
@@ -513,7 +511,7 @@ class ResultService {
 
 ### Code mangling
 
-Kotlin mangles function names to support overloading and special characters. A Kotlin function named `get_user_data` or an overloaded `process(String)` / `process(Int)` will appear in JS with compiler-generated suffixed names like `process_za3rmp$` that break any stable JS API contract.
+Kotlin mangles function names to support overloading and special characters. An overloaded `process(String)` / `process(Int)` appears in JS with compiler-generated names like `process_za3rmp$`, which breaks the JS API contract.
 
 **Problem:**
 
@@ -528,7 +526,7 @@ class Service {
 **What this plugin does:**
 
 - If a function has `@JsName("name")`, that name is used as the exported JS name.
-- If multiple overloads exist without `@JsName`, the plugin emits a **compile error** instead of silently generating broken wrappers.
+- If multiple overloads exist without `@JsName`, the plugin emits a **compile error** instead of generating mangled wrappers.
 
 ```kotlin
 @JsExportClass
@@ -551,7 +549,7 @@ Kotlin/JS name mangling conflict: Overloaded function 'process' must be annotate
 
 ### Suspended functions
 
-Kotlin suspend functions cannot be called from JavaScript — they require a coroutine context that JS doesn't have. They must be wrapped in `Promise` to be consumed by JS `async/await` or `.then()`.
+Kotlin suspend functions cannot be called from JavaScript. They require a coroutine context that JS does not have. They must be wrapped in `Promise` for JS `async/await` or `.then()`.
 
 **Problem:**
 
@@ -562,7 +560,7 @@ suspend fun fetchUser(id: Long): String = TODO() // not callable from JS
 
 **What this plugin generates:**
 
-Suspend functions are automatically wrapped in `scope.promise { }` using a `MainScope`. The return type is adjusted to `Promise<T>` with all other type conversions (collections, BigInt) applied inside the promise body.
+Suspend functions are wrapped in `scope.promise { }` using a `MainScope`. The return type becomes `Promise<T>`, with the other type conversions (collections, BigInt) applied inside the promise body.
 
 ```kotlin
 @JsExportClass

@@ -30,12 +30,15 @@ internal object ManglingHandler {
     }
 
     /**
-     * Validates [functions] for name conflicts within [classDecl]:
+     * Validates [functions] for name conflicts:
      * - Overloaded functions (same Kotlin name) without `@JsName` are reported as errors.
      * - Multiple functions resolving to the same exported JS name are reported as errors.
+     *
+     * [classDecl] is the enclosing class used as the diagnostic node for the duplicate-name
+     * error. It is `null` for standalone functions collected into `JsExportUtils`.
      */
     fun checkConflicts(
-        classDecl: KSClassDeclaration,
+        classDecl: KSClassDeclaration?,
         functions: List<KSFunctionDeclaration>,
         logger: KSPLogger,
     ) {

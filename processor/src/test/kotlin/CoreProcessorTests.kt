@@ -135,12 +135,12 @@ class CoreProcessorTests : BaseProcessorTest() {
         val source =
             SourceFile.kotlin(
                 "CoreService.kt",
-                """
+                $$"""
                 import annotations.JsExportClass
 
                 @JsExportClass
                 class CoreService(private val name: String) {
-                    fun greet(): String = "Hello, ${'$'}name"
+                    fun greet(): String = "Hello, $name"
                 }
                 """.trimIndent(),
             )

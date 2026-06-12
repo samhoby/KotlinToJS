@@ -57,7 +57,7 @@ class CollectionProcessorTests : BaseProcessorTest() {
                 "CollectionService.kt",
                 """
                 import annotations.JsExportClass
-                
+
                 @JsExportClass
                 class CollectionService {
                     fun getMatrix(): List<List<String>> = listOf(listOf("a"))
@@ -69,6 +69,35 @@ class CollectionProcessorTests : BaseProcessorTest() {
         val wrapperCode = files.single { it.name == "CollectionServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("Array<Array<String>>"))
+        assertTrue(
+            wrapperCode.contains("service.getMatrix().map { it.toTypedArray() }.toTypedArray()"),
+            "Nested list return must convert inner lists recursively, not just the outer one",
+        )
+    }
+
+    @Test
+    fun `should map nested List parameter recursively back to nested List`() {
+        val source =
+            SourceFile.kotlin(
+                "CollectionService.kt",
+                """
+                import annotations.JsExportClass
+
+                @JsExportClass
+                class CollectionService {
+                    fun setMatrix(matrix: List<List<String>>) = matrix
+                }
+                """.trimIndent(),
+            )
+
+        val files = compile(source)
+        val wrapperCode = files.single { it.name == "CollectionServiceJs.kt" }.readText()
+
+        assertTrue(wrapperCode.contains("matrix: Array<Array<String>>"), "Nested list parameter should expose nested Array")
+        assertTrue(
+            wrapperCode.contains("matrix.map { it.toList() }.toList()"),
+            "Nested list parameter must convert inner arrays recursively, not just the outer one",
+        )
     }
 
     @Test
