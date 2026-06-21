@@ -20,7 +20,7 @@ class StandaloneFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "JsExportUtils.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "JsExportUtils.kt" }.readText()
 
         assertTrue(wrapperCode.contains("object JsExportUtils"), "Should generate a JsExportUtils object")
         assertTrue(wrapperCode.contains("fun greet(name: String): String"), "Standalone function should be exported")
@@ -51,7 +51,7 @@ class StandaloneFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(first, second)
-        val utils = files.filter { it.name == "JsExportUtils.kt" }
+        val utils = files.filter { file -> file.name == "JsExportUtils.kt" }
         assertEquals(utils.size, 1, "All standalone functions must land in a single JsExportUtils file")
 
         val wrapperCode = utils.single().readText()
@@ -73,7 +73,7 @@ class StandaloneFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "JsExportUtils.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "JsExportUtils.kt" }.readText()
 
         assertTrue(wrapperCode.contains("values: Array<String>"), "List parameter should become Array")
         assertTrue(wrapperCode.contains("): Array<String>"), "List return should become Array")
@@ -98,9 +98,12 @@ class StandaloneFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "JsExportUtils.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "JsExportUtils.kt" }.readText()
 
-        assertTrue(wrapperCode.contains("fun load(id: String): Promise<String>"), "Suspend function should return Promise")
+        assertTrue(
+            wrapperCode.contains("fun load(id: String): Promise<String>"),
+            "Suspend function should return Promise",
+        )
         assertTrue(wrapperCode.contains("scope.promise"), "Should delegate through a coroutine scope")
         assertTrue(wrapperCode.contains("load(id)"), "Should call the original suspend function")
     }
@@ -123,7 +126,7 @@ class StandaloneFunctionProcessorTests : BaseProcessorTest() {
 
         val messages = compileWithMessages(source)
         assertTrue(
-            messages.any { it.contains("name mangling conflict") },
+            messages.any { message -> message.contains("name mangling conflict") },
             "Overloaded standalone functions without @JsName should fail the build",
         )
     }

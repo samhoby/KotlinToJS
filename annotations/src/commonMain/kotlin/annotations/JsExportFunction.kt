@@ -12,7 +12,7 @@ package annotations
  * ```kotlin
  * class OrderService {
  *     @JsExportFunction
- *     fun placeOrder(items: List<String>): Map<String, Int> = TODO()
+ *     fun placeOrder(items: List<String>): Map<String, Int> = items.associateWith { it.length }
  * }
  * // generates: object OrderServiceJs { fun placeOrder(items: Array<String>): Json }
  * ```

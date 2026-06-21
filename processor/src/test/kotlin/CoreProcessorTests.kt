@@ -23,11 +23,11 @@ class CoreProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "CoreServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="CoreServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("private val service: CoreService = CoreService()"))
         assertFalse(wrapperCode.contains("<init>"), "Generated code should not contain constructors")
-        assertTrue(files.none { it.name == "TypeConversion.kt" }, "TypeConversion should not be generated if there are no maps")
+        assertTrue(files.none { file -> file.name =="TypeConversion.kt" }, "TypeConversion should not be generated if there are no maps")
     }
 
     @Test
@@ -46,7 +46,7 @@ class CoreProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "CoreServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="CoreServiceJs.kt" }.readText()
 
         assertFalse(wrapperCode.contains("CoreService()"), "Should not instantiate an object")
     }
@@ -72,12 +72,18 @@ class CoreProcessorTests : BaseProcessorTest() {
             )
 
         val generatedFiles = compile(file1, file2)
-        val typeConversionFiles = generatedFiles.filter { it.name == "TypeConversion.kt" }
-        assertEquals(1, typeConversionFiles.size, "Should generate only one TypeConversion.kt")
+        val conversionFiles = generatedFiles.filter { file -> file.name =="TypeConversion.kt" }
+        assertEquals(1, conversionFiles.size, "Should generate a single TypeConversion.kt regardless of how many map signatures appear")
 
-        val conversionsCode = typeConversionFiles.first().readText()
-        assertTrue(conversionsCode.contains("fun Json.toMap1()"))
-        assertTrue(conversionsCode.contains("fun Json.toMap2()"))
+        val conversionsCode = conversionFiles.first().readText()
+        assertTrue(
+            conversionsCode.contains("fun Json.toMap1()"),
+            "ServiceA's map conversion should be in TypeConversion.kt",
+        )
+        assertTrue(
+            conversionsCode.contains("fun Json.toMap2()"),
+            "ServiceB's map conversion should be in TypeConversion.kt with a distinct ID so the two do not clash",
+        )
     }
 
     @Test
@@ -105,7 +111,7 @@ class CoreProcessorTests : BaseProcessorTest() {
             )
 
         val generatedFiles = compile(file1, file2)
-        assertTrue(generatedFiles.none { it.name == "TypeConversion.kt" }, "Should not generate TypeConversion.kt without maps")
+        assertTrue(generatedFiles.none { file -> file.name =="TypeConversion.kt" }, "Should not generate TypeConversion.kt without maps")
     }
 
     @Test
@@ -125,7 +131,7 @@ class CoreProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "UserServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="UserServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.startsWith("package com.example.services"), "Wrapper should be in same package as source class")
     }
@@ -146,7 +152,7 @@ class CoreProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "CoreServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="CoreServiceJs.kt" }.readText()
 
         assertFalse(wrapperCode.contains("<init>"), "Constructor should never appear in the wrapper")
         assertTrue(wrapperCode.contains("fun greet()"), "Regular function should still be present")
@@ -173,7 +179,7 @@ class CoreProcessorTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), mapOf("longAsBigInt" to "true"))
-        val wrapperCode = files.single { it.name == "CoreServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="CoreServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("fun ping()"))
         assertTrue(wrapperCode.contains("fun fetchCount()"))

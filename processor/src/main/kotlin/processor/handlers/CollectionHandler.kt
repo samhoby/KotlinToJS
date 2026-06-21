@@ -40,14 +40,14 @@ internal class CollectionHandler(private val bigintEnabled: Boolean) {
         TypeMapping(
             jsTypeName = toJsName(type),
             toKotlin = { name -> toKotlinExpr(type, name) },
-            fromKotlin = { expr -> fromKotlinExpr(type, expr) },
+            toJs = { expr -> toJsExpr(type, expr) },
         )
 
     /** Builds the Kotlin → JS expression for a collection or element [expr] of [type]. */
-    private fun fromKotlinExpr(type: KSType, expr: String): String = when {
+    private fun toJsExpr(type: KSType, expr: String): String = when {
         type.isList || type.isSet -> {
-            val element = fromKotlinExpr(type.arguments.first().type!!.resolve(), "it")
-            if (element == "it") "$expr.toTypedArray()" else "$expr.map { $element }.toTypedArray()"
+            val element = toJsExpr(type.arguments.first().type!!.resolve(), "elem")
+            if (element == "elem") "$expr.toTypedArray()" else "$expr.map { elem -> $element }.toTypedArray()"
         }
         type.isLong -> if (bigintEnabled) expr else "$expr.toDouble()"
         else -> expr
@@ -56,9 +56,9 @@ internal class CollectionHandler(private val bigintEnabled: Boolean) {
     /** Builds the JS → Kotlin expression for a collection or element [expr] of [type]. */
     private fun toKotlinExpr(type: KSType, expr: String): String = when {
         type.isList || type.isSet -> {
-            val element = toKotlinExpr(type.arguments.first().type!!.resolve(), "it")
+            val element = toKotlinExpr(type.arguments.first().type!!.resolve(), "elem")
             val collector = if (type.isList) "toList" else "toSet"
-            if (element == "it") "$expr.$collector()" else "$expr.map { $element }.$collector()"
+            if (element == "elem") "$expr.$collector()" else "$expr.map { elem -> $element }.$collector()"
         }
         type.isLong -> if (bigintEnabled) expr else "$expr.toLong()"
         else -> expr

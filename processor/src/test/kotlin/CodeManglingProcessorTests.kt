@@ -34,7 +34,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
         val messages = compileWithMessages(source)
 
         assertTrue(
-            messages.any { it.contains("name mangling conflict") && it.contains("sum") },
+            messages.any { message -> message.contains("name mangling conflict") && message.contains("sum") },
             "Should report a conflict for overloaded 'sum' without @JsName",
         )
     }
@@ -60,7 +60,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
         val messages = compileWithMessages(source)
 
         assertTrue(
-            messages.any { it.contains("name mangling conflict") && it.contains("sum") },
+            messages.any { message -> message.contains("name mangling conflict") && message.contains("sum") },
             "Should report a conflict for overloaded @JsExportFunction 'sum' without @JsName",
         )
     }
@@ -86,7 +86,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
         val messages = compileWithMessages(source)
 
         assertTrue(
-            messages.any { it.contains("name mangling conflict") && it.contains("sum") },
+            messages.any { message -> message.contains("name mangling conflict") && message.contains("sum") },
             "Should report a conflict when only one overload has @JsName",
         )
     }
@@ -114,7 +114,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
         val messages = compileWithMessages(source)
 
         assertTrue(
-            messages.any { it.contains("same JS name") },
+            messages.any { message -> message.contains("same JS name") },
             "Should report a duplicate exported name conflict",
         )
     }
@@ -142,7 +142,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "MathServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="MathServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("fun sumInt("), "First overload should use @JsName value")
         assertTrue(wrapperCode.contains("fun sumDouble("), "Second overload should use @JsName value")
@@ -171,7 +171,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "MathServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="MathServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("fun sumInt("), "Int overload should be exported as sumInt")
         assertTrue(wrapperCode.contains("fun sumDouble("), "Double overload should be exported as sumDouble")
@@ -198,7 +198,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), mapOf("longAsBigInt" to "true"))
-        val wrapperCode = files.single { it.name == "MathServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="MathServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("fun sumLong("), "Long overload should be renamed")
         assertTrue(wrapperCode.contains("a: Long"), "Long parameter should stay Long in BigInt mode")
@@ -232,7 +232,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), mapOf("longAsBigInt" to "true"))
-        val wrapperCode = files.single { it.name == "MathServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="MathServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("fun sumSync("), "Sync overload should be exported as sumSync")
         assertFalse(wrapperCode.contains("Promise<Int>"), "Sync overload should not return Promise")
@@ -261,7 +261,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "GreetServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="GreetServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("fun sayHello("), "Should use @JsName value as the exported function name")
         assertFalse(wrapperCode.contains("fun greet("), "Original Kotlin name should not appear in wrapper")

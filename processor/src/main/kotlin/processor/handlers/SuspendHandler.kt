@@ -29,5 +29,5 @@ internal object SuspendHandler {
     fun buildBody(
         call: String,
         returnMapping: TypeMapping,
-    ): String = "return scope.promise { ${returnMapping.fromKotlin(call)} }"
+    ): String = "return scope.promise { ${returnMapping.toJs(call)} }"
 }

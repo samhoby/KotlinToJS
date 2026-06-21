@@ -25,7 +25,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "UserServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "UserServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("id: String"), "Value class parameter should be unwrapped to String")
         assertTrue(wrapperCode.contains("UserId(id)"), "Wrapper should reconstruct the value class before calling service")
@@ -51,7 +51,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "UserServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "UserServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("): String"), "Value class return should be unwrapped to String")
         assertTrue(wrapperCode.contains(".value"), "Wrapper should access the underlying property of the return value")
@@ -77,7 +77,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "OrderServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "OrderServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("order: String"), "Parameter should be unwrapped to String")
         assertTrue(wrapperCode.contains("OrderId(order)"), "Value class should be reconstructed for the service call")
@@ -104,7 +104,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), mapOf("longAsBigInt" to "true"))
-        val wrapperCode = files.single { it.name == "InvoiceServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "InvoiceServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("id: Long"), "Long-backed value class parameter should expose Long in BigInt mode")
         assertTrue(wrapperCode.contains("InvoiceId(id)"), "Should reconstruct the value class")
@@ -130,7 +130,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "ShopServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "ShopServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("id: String"), "ProductId parameter should unwrap to String")
         assertTrue(wrapperCode.contains("ProductId(id)"), "Should reconstruct ProductId")
@@ -156,7 +156,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "UserIdJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "UserIdJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("fun display(userId: String)"), "Self param 'userId' should be first argument")
         assertTrue(wrapperCode.contains("fun withPrefix(userId: String, prefix: String)"), "Self param precedes function params")
@@ -183,7 +183,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "ScoreJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "ScoreJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("fun doubled(score: Int): Int"), "Self-returning method should expose underlying type")
         assertTrue(wrapperCode.contains("Score(score).doubled()"), "Should construct value class for the call")
@@ -215,7 +215,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "TaskIdJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "TaskIdJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("fun fetch(taskId: String): Promise<String>"), "Suspend method should return Promise")
         assertTrue(wrapperCode.contains("TaskId(taskId).fetch()"), "Should construct value class in suspend body")
@@ -239,7 +239,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), mapOf("longAsBigInt" to "true"))
-        val wrapperCode = files.single { it.name == "EventIdJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "EventIdJs.kt" }.readText()
 
         assertTrue(
             wrapperCode.contains("fun label(eventId: Long): String"),
@@ -267,10 +267,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "TokenServiceJs.kt" }.readText()
-
-        println(wrapperCode)
-
+        val wrapperCode = files.single { file -> file.name == "TokenServiceJs.kt" }.readText()
         assertTrue(wrapperCode.contains("token: String"), "Value class on @JsExportFunction should unwrap to String")
         assertTrue(wrapperCode.contains("Token(token)"), "Should reconstruct Token for the service call")
     }

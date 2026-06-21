@@ -51,7 +51,9 @@ internal object ValueClassHandler {
         return TypeMapping(
             jsTypeName = innerMapping.jsTypeName,
             toKotlin = { name -> "$simpleName(${innerMapping.toKotlin(name)})" },
-            fromKotlin = { expr -> innerMapping.fromKotlin("($expr).$propName") },
+            toJs = { expr -> innerMapping.toJs("($expr).$propName") },
+            importsForToKotlin = innerMapping.importsForToKotlin,
+            importsForToJs = innerMapping.importsForToJs,
         )
     }
 }

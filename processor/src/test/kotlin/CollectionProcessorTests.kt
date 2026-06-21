@@ -3,6 +3,7 @@ package processor
 import com.tschuchort.compiletesting.SourceFile
 import org.junit.jupiter.api.Test
 import kotlin.test.assertNotNull
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class CollectionProcessorTests : BaseProcessorTest() {
@@ -22,7 +23,7 @@ class CollectionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "CollectionServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "CollectionServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("Array<String>"))
         assertTrue(wrapperCode.contains("toTypedArray()"))
@@ -44,7 +45,7 @@ class CollectionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "CollectionServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "CollectionServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("items: Array<String>"))
         assertTrue(wrapperCode.contains("items.toList()"))
@@ -61,16 +62,17 @@ class CollectionProcessorTests : BaseProcessorTest() {
                 @JsExportClass
                 class CollectionService {
                     fun getMatrix(): List<List<String>> = listOf(listOf("a"))
+                    fun getDataFrame(): List<List<List<String>>> = listOf(listOf(listOf("a")))
                 }
                 """.trimIndent(),
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "CollectionServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "CollectionServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("Array<Array<String>>"))
         assertTrue(
-            wrapperCode.contains("service.getMatrix().map { it.toTypedArray() }.toTypedArray()"),
+            wrapperCode.contains("service.getMatrix().map { elem -> elem.toTypedArray() }.toTypedArray()"),
             "Nested list return must convert inner lists recursively, not just the outer one",
         )
     }
@@ -91,11 +93,11 @@ class CollectionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "CollectionServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "CollectionServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("matrix: Array<Array<String>>"), "Nested list parameter should expose nested Array")
         assertTrue(
-            wrapperCode.contains("matrix.map { it.toList() }.toList()"),
+            wrapperCode.contains("matrix.map { elem -> elem.toList() }.toList()"),
             "Nested list parameter must convert inner arrays recursively, not just the outer one",
         )
     }
@@ -116,8 +118,8 @@ class CollectionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "CollectionServiceJs.kt" }.readText()
-        val conversionsCode = files.single { it.name == "TypeConversion.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "CollectionServiceJs.kt" }.readText()
+        val conversionsCode = files.single { file -> file.name == "TypeConversion.kt" }.readText()
 
         assertTrue(wrapperCode.contains("Json"))
         assertTrue(wrapperCode.contains("toJson1()"))
@@ -142,11 +144,11 @@ class CollectionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "CollectionServiceJs.kt" }.readText()
-        val conversionsCode = files.single { it.name == "TypeConversion.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "CollectionServiceJs.kt" }.readText()
+        val conversionsCode = files.single { file -> file.name == "TypeConversion.kt" }.readText()
 
         assertTrue(wrapperCode.contains("config: Json"))
-        assertTrue(wrapperCode.contains("toMap1()"))
+        assertTrue(wrapperCode.contains("config.toMap1()"))
         assertNotNull(conversionsCode)
     }
 
@@ -166,7 +168,7 @@ class CollectionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), mapOf("longAsBigInt" to "true"))
-        val wrapperCode = files.single { it.name == "CollectionServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "CollectionServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("ids: Array<Long>"), "Set<Long> should become Array<Long> in BigInt mode")
         assertTrue(wrapperCode.contains("ids.toSet()"))
@@ -189,13 +191,17 @@ class CollectionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "CollectionServiceJs.kt" }.readText()
-        val conversionsCode = files.single { it.name == "TypeConversion.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "CollectionServiceJs.kt" }.readText()
+        val conversionsCode = files.single { file -> file.name == "TypeConversion.kt" }.readText()
 
         assertTrue(wrapperCode.contains("Json"), "Nested Map should still expose as Json at the boundary")
         assertTrue(
-            conversionsCode.contains("toMap1()") || conversionsCode.contains("toMap2()"),
-            "Should generate conversion functions for nested maps",
+            conversionsCode.contains("fun Json.toMap1()"),
+            "Should generate the outer map decode function (ID 1, registered first)",
+        )
+        assertTrue(
+            conversionsCode.contains("fun Json.toMap2()"),
+            "Should recursively register the inner map's conversion function (ID 2, registered during nested walk)",
         )
     }
 
@@ -215,12 +221,17 @@ class CollectionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), mapOf("longAsBigInt" to "true"))
-        val wrapperCode = files.single { it.name == "CollectionServiceJs.kt" }.readText()
-        val conversionsCode = files.single { it.name == "TypeConversion.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "CollectionServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("payload: Json"), "Map<Long, String> parameter should become Json")
-        assertTrue(conversionsCode.contains("Map<Long, String>"), "TypeConversion should reference Kotlin types")
-        assertTrue(conversionsCode.contains("unsafeCast<Long>()"), "BigInt mode key conversion should unsafeCast to Long")
+        assertTrue(
+            wrapperCode.contains("payload.toMap1()"),
+            "Wrapper should call the generated decode function to convert Json back to Map<Long, String>",
+        )
+        assertFalse(
+            wrapperCode.contains("unsafeCast<Map<Long, String>>()"),
+            "The decode function returns the correct type — no unsafeCast needed in the wrapper",
+        )
     }
 
     @Test
@@ -239,7 +250,7 @@ class CollectionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "CollectionServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "CollectionServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("Array<Array<String>>"))
         assertTrue(wrapperCode.contains("toTypedArray()"))

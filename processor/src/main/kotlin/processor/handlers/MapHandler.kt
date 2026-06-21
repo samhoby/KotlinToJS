@@ -1,155 +1,284 @@
+@file:Suppress("ktlint:standard:no-wildcard-imports")
+
 package processor.handlers
 
 import com.google.devtools.ksp.processing.CodeGenerator
+import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.KSType
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
-import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
-import com.squareup.kotlinpoet.STAR
-import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
-import processor.isList
-import processor.isLong
-import processor.isMap
-import processor.isSet
+import processor.*
 import types.TypeMapping
 
 /**
- * Handles `Map<K, V>` → `Json` boundary conversion.
+ * Handles `Map<K, V>` ⇄ `Json` boundary conversion.
  *
- * `Map` is not supported at `@JsExport` boundaries. This handler converts maps to the Kotlin/JS
- * `Json` type and generates typed `toMapN()` / `toJsonN()` extension functions (collected into
- * `TypeConversion.kt`) for each unique map signature encountered during a processing round.
- * Must be instantiated per [processor.WrapperProcessor] to keep conversion state isolated across
- * KSP processing rounds.
+ * For each distinct map signature, generates a pair of extension functions whose names are derived
+ * from a unique sequential ID, for example `Json.toMap1()` and `Map<String, Long>.toJson1()`,
+ * written to `TypeConversion.kt`.
  *
- * [bigintEnabled] mirrors the plugin-level `longAsBigInt` option: when `true`, `Long` keys and
- * values inside maps are cast directly (`unsafeCast<Long>()`) rather than converted via `Double`.
+ * Keys and values are converted recursively. Nested map signatures are registered as their own
+ * conversion functions.
  */
-internal class MapHandler(private val bigintEnabled: Boolean = false) {
-    companion object {
-        /** The JS-compatible type used at the `@JsExport` boundary in place of `Map`. */
-        val jsonClass = ClassName("kotlin.js", "Json")
-    }
+internal class MapHandler(
+    private val bigintEnabled: Boolean,
+    private val logger: KSPLogger,
+) {
+    private var currentId = 1
 
-    private val mapConversions = mutableSetOf<String>()
-    private val mapConversionFunctions = mutableListOf<FunSpec>()
-    private val typeSignaturesToAliases = mutableMapOf<String, String>()
-    private var typeCounter = 1
+    private val typeIds = mutableMapOf<String, Int>()
 
-    /** Returns true when [type] is `kotlin.collections.Map`. */
+    private val conversions = linkedMapOf<String, Pair<FunSpec, FunSpec>>()
+
+    /** `true` when at least one map signature has been registered. */
+    val hasMapType: Boolean get() = conversions.isNotEmpty()
+
+    /** Returns `true` if [type] is a `Map<*, *>`. */
     fun handles(type: KSType): Boolean = type.isMap
 
     /**
-     * Returns a [TypeMapping] that converts the map to [jsonClass] at the JS boundary, and
-     * registers the corresponding `toMapN` / `toJsonN` extension functions for later emission.
+     * Registers conversion functions for [type] (and any nested maps) and returns a [TypeMapping]
+     * whose [TypeMapping.toKotlin] / [TypeMapping.toJs] lambdas call the generated extension functions.
      */
     fun resolveMapping(type: KSType): TypeMapping {
-        buildConversionFunctions(type)
-        val id = type.aliasId()
+        registerConversions(type)
+        val decode = decodeName(type)
+        val encode = encodeName(type)
         return TypeMapping(
             jsTypeName = jsonClass,
-            toKotlin = { name -> "($name).toMap$id()" },
-            fromKotlin = { expr -> "($expr).toJson$id()" },
+            toKotlin = { name -> "$name.$decode()" },
+            toJs = { expr -> "($expr).$encode()" },
+            importsForToKotlin = listOf(decode),
+            importsForToJs = listOf(encode),
         )
     }
 
-    /** Returns true if any map conversions were registered during this processing round. */
-    fun hasConversions(): Boolean = mapConversionFunctions.isNotEmpty()
-
     /**
-     * Writes `TypeConversion.kt` to disk, containing the base `toMap()` helper and all
-     * typed `toMapN` / `toJsonN` extension functions accumulated this round.
+     * Writes `TypeConversion.kt` containing all registered decode/encode function pairs.
+     * Does nothing if no map signatures were registered.
      */
     fun generateTypeConversion(codeGenerator: CodeGenerator) {
-        val file = FileSpec.builder("", "TypeConversion").addFunction(
-            FunSpec.builder("toMap")
-                .receiver(jsonClass)
-                .returns(Map::class.asClassName().parameterizedBy(STAR, STAR))
-                .addStatement(
-                    "return js(%S).unsafeCast<Array<String>>().associateWith { this.asDynamic()[it] }",
-                    "Object.keys(this)",
-                ).build(),
-        )
-        mapConversionFunctions.forEach { file.addFunction(it) }
-        file.build().writeTo(codeGenerator, aggregating = false)
+        if (!hasMapType) return
+        val fileSpecBuilder =
+            FileSpec
+                .builder("kotlintojs.generated", "TypeConversion")
+                .addImport("kotlin.js", "Json")
+
+        conversions.values.forEach { (decodeSpec, encodeSpec) ->
+            fileSpecBuilder.addFunction(decodeSpec)
+            fileSpecBuilder.addFunction(encodeSpec)
+        }
+        fileSpecBuilder.build().writeTo(codeGenerator, aggregating = false)
     }
 
-    /** Clears accumulated conversion functions after they have been written to disk. */
-    fun clear() = mapConversionFunctions.clear()
-
-    /** Returns (or creates) a stable numeric alias for this map's type signature. */
-    private fun KSType.aliasId(): String = typeSignaturesToAliases.getOrPut(signature()) { "${typeCounter++}" }
-
-    /** Produces a canonical string key that uniquely identifies a map's key/value type pair. */
-    private fun KSType.signature(): String = when {
-        isLong -> "Long"
-        isList || isSet -> "${arguments.first().type!!.resolve().signature()}${if (isList) "List" else "Set"}"
-        isMap -> "${arguments[0].type!!.resolve().signature()}${arguments[1].type!!.resolve().signature()}Map"
-        else -> declaration.simpleName.asString()
+    /** Resets all state so the handler is ready for the next KSP processing round. */
+    fun clear() {
+        conversions.clear()
+        typeIds.clear()
+        currentId = 1
     }
+
+    /** Registers decode+encode specs for [mapType] if not already present, then recurses into nested maps. */
+    private fun registerConversions(mapType: KSType) {
+        val key = signature(mapType)
+        if (key in conversions) return
+        conversions[key] = buildDecodeSpec(mapType) to buildEncodeSpec(mapType)
+        registerNestedMaps(mapType.keyType)
+        registerNestedMaps(mapType.valueType)
+    }
+
+    /** Walks [type] recursively, registering any `Map` signatures found inside collections or nested maps. */
+    private fun registerNestedMaps(type: KSType) {
+        when {
+            type.isMap -> registerConversions(type)
+            type.isList || type.isSet -> registerNestedMaps(type.elementType)
+        }
+    }
+
+    /** Builds a `fun Json.toMapN(): Map<K, V>` extension that converts a JS object to a Kotlin map. */
+    private fun buildDecodeSpec(mapType: KSType): FunSpec {
+        val keyType = mapType.keyType
+        val valueType = mapType.valueType
+        val builder = FunSpec.builder(decodeName(mapType)).receiver(jsonClass).returns(mapType.toTypeName())
+        if (keyType.isString) {
+            builder.addStatement(
+                "return js(%S).unsafeCast<Array<String>>().associateWith { %L }",
+                "Object.keys(this)",
+                jsValueToKotlin(valueType, "this.asDynamic()[it]"),
+            )
+        } else {
+            builder.addStatement(
+                "return js(%S).unsafeCast<Array<String>>().associate { k -> %L to %L }",
+                "Object.keys(this)",
+                jsKeyToKotlin(keyType),
+                jsValueToKotlin(valueType, "this.asDynamic()[k]"),
+            )
+        }
+        return builder.build()
+    }
+
+    /** Builds a `fun Map<K, V>.toJsonN(): Json` extension that folds a Kotlin map into a JS object. */
+    private fun buildEncodeSpec(mapType: KSType): FunSpec =
+        FunSpec
+            .builder(encodeName(mapType))
+            .receiver(mapType.toTypeName())
+            .returns(jsonClass)
+            .beginControlFlow("return entries.fold(js(%S)) { acc, (k, v) ->", "{}")
+            .addStatement(
+                "acc.asDynamic()[%L] = %L",
+                kotlinKeyToJs(mapType.keyType),
+                kotlinValueToJs(mapType.valueType, "v"),
+            ).addStatement("acc")
+            .endControlFlow()
+            .build()
+
+    /** Converts a JS object key string `k` to the Kotlin key type. JS object keys always arrive as String. */
+    private fun jsKeyToKotlin(keyType: KSType): String =
+        when (keyType.declaration.qualifiedName?.asString()) {
+            "kotlin.String" -> {
+                "k"
+            }
+
+            "kotlin.Long" -> {
+                "k.toLong()"
+            }
+
+            "kotlin.Int" -> {
+                "k.toInt()"
+            }
+
+            "kotlin.Short" -> {
+                "k.toShort()"
+            }
+
+            "kotlin.Byte" -> {
+                "k.toByte()"
+            }
+
+            "kotlin.Double" -> {
+                "k.toDouble()"
+            }
+
+            "kotlin.Float" -> {
+                "k.toFloat()"
+            }
+
+            "kotlin.Boolean" -> {
+                "k.toBoolean()"
+            }
+
+            else -> {
+                val declaration = keyType.declaration
+                logger.error(
+                    "Unsupported @JsExport map key type '${declaration.simpleName.asString()}'. " +
+                        "Map keys must be String or a primitive (Int, Long, Short, Byte, Double, Float, Boolean).",
+                    symbol = declaration,
+                )
+                val targetType = declaration.qualifiedName?.asString() ?: "Any"
+                "k.unsafeCast<$targetType>()"
+            }
+        }
+
+    /** Returns the JS key expression: string keys pass through as-is; all others are stringified. */
+    private fun kotlinKeyToJs(keyType: KSType): String = if (keyType.isString) "k" else "k.toString()"
+
+    /** Returns a Kotlin expression that converts JS value [expr] of [valueType] to the Kotlin equivalent. */
+    private fun jsValueToKotlin(
+        valueType: KSType,
+        expr: String,
+    ): String =
+        when {
+            valueType.isLong -> {
+                if (bigintEnabled) "$expr.unsafeCast<Long>()" else "$expr.unsafeCast<Double>().toLong()"
+            }
+
+            valueType.isList || valueType.isSet -> {
+                val elemExpr = jsValueToKotlin(valueType.elementType, "elem")
+                val collector = if (valueType.isSet) "toSet" else "toList"
+                "$expr.unsafeCast<Array<Any?>>().map { elem -> $elemExpr }.$collector()"
+            }
+
+            valueType.isMap -> {
+                "$expr.unsafeCast<Json>().${decodeName(valueType)}()"
+            }
+
+            else -> {
+                primitiveAsExpr(valueType, expr)
+            }
+        }
+
+    /** Returns a Kotlin expression that converts [varName] of [valueType] to its JS-safe equivalent. */
+    private fun kotlinValueToJs(
+        valueType: KSType,
+        varName: String,
+    ): String =
+        when {
+            valueType.isLong -> {
+                if (bigintEnabled) varName else "$varName.toDouble()"
+            }
+
+            valueType.isList || valueType.isSet -> {
+                val elemExpr = kotlinValueToJs(valueType.elementType, "elem")
+                if (elemExpr == "elem") "$varName.toTypedArray()" else "$varName.map { elem -> $elemExpr }.toTypedArray()"
+            }
+
+            valueType.isMap -> {
+                "$varName.${encodeName(valueType)}()"
+            }
+
+            else -> {
+                varName
+            }
+        }
+
+    /** Wraps [expr] in an `unsafeCast` to the Kotlin primitive matching [type]. */
+    private fun primitiveAsExpr(
+        type: KSType,
+        expr: String,
+    ): String {
+        val nullable = if (type.isMarkedNullable) "?" else ""
+        val qualifiedName = type.declaration.qualifiedName?.asString() ?: return expr
+        val castTarget =
+            when (qualifiedName) {
+                "kotlin.String" -> "String"
+                "kotlin.Int" -> "Int"
+                "kotlin.Double" -> "Double"
+                "kotlin.Float" -> "Float"
+                "kotlin.Boolean" -> "Boolean"
+                "kotlin.Short" -> "Short"
+                "kotlin.Byte" -> "Byte"
+                else -> qualifiedName
+            }
+        return "$expr.unsafeCast<$castTarget$nullable>()"
+    }
+
+    /** Returns the stable numeric ID for [mapType], assigning a new one on first encounter. */
+    private fun getIdFor(mapType: KSType): Int = typeIds.getOrPut(signature(mapType)) { currentId++ }
 
     /**
-     * Generates and registers the `toMapN` (Json → Kotlin) and `toJsonN` (Kotlin → Json)
-     * extension functions for [type]. Recursively handles nested map types.
+     * Produces a stable deduplication key for [type] by combining the declaration's qualified name
+     * with its type arguments recursively. Unlike [com.squareup.kotlinpoet.ksp.toTypeName] + [toString],
+     * this is not affected by KotlinPoet/KSP formatting or qualification changes across versions.
      */
-    private fun buildConversionFunctions(type: KSType) {
-        val id = type.aliasId()
-        if (!mapConversions.add("MapConversion_$id")) return
-
-        val kType = type.arguments[0].type!!.resolve()
-        val vType = type.arguments[1].type!!.resolve()
-        val mapType = Map::class.asClassName().parameterizedBy(kType.toTypeName(), vType.toTypeName())
-
-        mapConversionFunctions.add(
-            FunSpec.builder("toMap$id")
-                .receiver(jsonClass)
-                .returns(mapType)
-                .addStatement(
-                    "return toMap().entries.associate { (k, v) -> ${buildToKotlin(kType, "k")} to ${buildToKotlin(vType, "v")} }",
-                ).build(),
-        )
-
-        mapConversionFunctions.add(
-            FunSpec.builder("toJson$id")
-                .receiver(mapType)
-                .returns(jsonClass)
-                .beginControlFlow("return entries.fold(js(%S)) { acc, (k, v) ->", "{}")
-                .addStatement("acc[%L] = %L", buildFromKotlin(kType, "k"), buildFromKotlin(vType, "v"))
-                .addStatement("acc")
-                .endControlFlow()
-                .build(),
-        )
-
-        if (kType.isMap) buildConversionFunctions(kType)
-        if (vType.isMap) buildConversionFunctions(vType)
+    private fun signature(type: KSType): String {
+        val base = type.declaration.qualifiedName?.asString() ?: type.declaration.simpleName.asString()
+        val args =
+            type.arguments.joinToString(",") { arg ->
+                arg.type?.resolve()?.let { signature(it) } ?: "*"
+            }
+        return if (args.isEmpty()) base else "$base<$args>"
     }
 
-    /** Builds the Kotlin code string that converts a JS value [expr] to its Kotlin equivalent. */
-    private fun buildToKotlin(type: KSType, expr: String): String = when {
-        type.isLong -> if (bigintEnabled) "($expr).unsafeCast<Long>()" else "($expr).unsafeCast<Double>().toLong()"
-        type.isList || type.isSet -> {
-            val inner = type.arguments.first().type!!.resolve()
-            val mapped = "($expr).unsafeCast<Array<*>>().map { ${buildToKotlin(inner, "it")} }"
-            if (type.isList) mapped else "($mapped).toSet()"
-        }
-        type.isMap -> "($expr).unsafeCast<Json>().toMap${type.aliasId()}()"
-        else -> "($expr).unsafeCast<${type.declaration.simpleName.asString()}>()"
-    }
+    /** Name of the `Json` extension that decodes this map type, e.g. `toMap1`. */
+    private fun decodeName(mapType: KSType): String = "toMap${getIdFor(mapType)}"
 
-    /** Builds the Kotlin code string that converts a Kotlin [expr] to its JS equivalent. */
-    private fun buildFromKotlin(type: KSType, expr: String): String = when {
-        type.isLong -> if (bigintEnabled) expr else "($expr).toDouble()"
-        type.isList || type.isSet -> {
-            val inner = buildFromKotlin(type.arguments.first().type!!.resolve(), "it")
-            "($expr).map { $inner }.toTypedArray()"
-        }
-        type.isMap -> {
-            buildConversionFunctions(type)
-            "($expr).toJson${type.aliasId()}()"
-        }
-        else -> expr
+    /** Name of the `Map` extension that encodes this map type, e.g. `toJson1`. */
+    private fun encodeName(mapType: KSType): String = "toJson${getIdFor(mapType)}"
+
+    companion object {
+        val jsonClass = ClassName("kotlin.js", "Json")
     }
 }

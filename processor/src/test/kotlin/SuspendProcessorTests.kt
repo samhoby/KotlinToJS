@@ -26,7 +26,7 @@ class SuspendProcessorTests : BaseProcessorTest() {
             )
 
         val filesWithSuspend = compile(sourceWithSuspend)
-        val wrapperWithSuspend = filesWithSuspend.single { it.name == "SuspendServiceJs.kt" }.readText()
+        val wrapperWithSuspend = filesWithSuspend.single { file -> file.name == "SuspendServiceJs.kt" }.readText()
         assertTrue(wrapperWithSuspend.contains("scope"))
 
         val sourceWithoutSuspend =
@@ -43,7 +43,7 @@ class SuspendProcessorTests : BaseProcessorTest() {
             )
 
         val filesWithoutSuspend = compile(sourceWithoutSuspend)
-        val wrapperWithoutSuspend = filesWithoutSuspend.single { it.name == "SyncServiceJs.kt" }.readText()
+        val wrapperWithoutSuspend = filesWithoutSuspend.single { file -> file.name == "SyncServiceJs.kt" }.readText()
         assertFalse(wrapperWithoutSuspend.contains("scope"))
     }
 
@@ -67,7 +67,7 @@ class SuspendProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "SuspendServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "SuspendServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("Promise<String>"))
         assertTrue(wrapperCode.contains("scope.promise"))
@@ -97,7 +97,7 @@ class SuspendProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "SuspendServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "SuspendServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("Promise<Array<Double>>"))
         assertTrue(wrapperCode.contains("Promise<Json>"))

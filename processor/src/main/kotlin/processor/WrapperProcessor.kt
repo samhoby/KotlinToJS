@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:no-wildcard-imports")
+
 package processor
 
 import annotations.JsExportClass
@@ -7,31 +9,13 @@ import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
-import com.google.devtools.ksp.symbol.ClassKind
-import com.google.devtools.ksp.symbol.KSAnnotated
-import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.google.devtools.ksp.symbol.KSType
-import com.google.devtools.ksp.symbol.Modifier
+import com.google.devtools.ksp.symbol.*
 import com.google.devtools.ksp.validate
-import com.squareup.kotlinpoet.AnnotationSpec
-import com.squareup.kotlinpoet.ClassName
-import com.squareup.kotlinpoet.FileSpec
-import com.squareup.kotlinpoet.FunSpec
-import com.squareup.kotlinpoet.KModifier
-import com.squareup.kotlinpoet.ParameterSpec
-import com.squareup.kotlinpoet.PropertySpec
-import com.squareup.kotlinpoet.TypeName
-import com.squareup.kotlinpoet.TypeSpec
+import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
-import processor.handlers.CollectionHandler
-import processor.handlers.LongHandler
-import processor.handlers.ManglingHandler
-import processor.handlers.MapHandler
-import processor.handlers.SuspendHandler
-import processor.handlers.ValueClassHandler
+import processor.handlers.*
 import types.TypeMapping
 
 /**
@@ -50,22 +34,35 @@ class WrapperProcessor(
     private val bigintEnabled = options["longAsBigInt"]?.toBoolean() ?: false
     private val longHandler = LongHandler(bigintEnabled, logger)
     private val collectionHandler = CollectionHandler(bigintEnabled)
-    private val mapHandler = MapHandler(bigintEnabled)
+    private val mapHandler = MapHandler(bigintEnabled, logger)
 
-    // Accumulates value-class imports that need to be added to the FileSpec for the current file.
-    // Cleared at the start of each generateWrapper call.
     private val pendingImports = mutableSetOf<ClassName>()
 
-    override fun process(resolver: Resolver): List<KSAnnotated> {
-        val classes = resolver
-            .getSymbolsWithAnnotation(JsExportClass::class.qualifiedName!!)
-            .filterIsInstance<KSClassDeclaration>()
-            .toList()
+    // Map conversion function names (from kotlintojs.generated) referenced by the file being built.
+    // Cleared at the start of each generateWrapper / generateUtils call.
+    private val pendingConversionImports = mutableSetOf<String>()
 
-        val functions = resolver
-            .getSymbolsWithAnnotation(JsExportFunction::class.qualifiedName!!)
-            .filterIsInstance<KSFunctionDeclaration>()
-            .toList()
+    /**
+     * Main KSP processing entry point. Collects all symbols annotated with [annotations.JsExportClass]
+     * and [annotations.JsExportFunction], groups member functions under their declaring class,
+     * checks for name-mangling conflicts, and generates the corresponding wrapper files.
+     *
+     * Standalone [annotations.JsExportFunction]s (not inside a class) are gathered into a single
+     * `JsExportUtils` object. Map types encountered during wrapper generation produce a shared
+     * `TypeConversion.kt` file at the end of the round.
+     */
+    override fun process(resolver: Resolver): List<KSAnnotated> {
+        val classes =
+            resolver
+                .getSymbolsWithAnnotation(JsExportClass::class.qualifiedName!!)
+                .filterIsInstance<KSClassDeclaration>()
+                .toList()
+
+        val functions =
+            resolver
+                .getSymbolsWithAnnotation(JsExportFunction::class.qualifiedName!!)
+                .filterIsInstance<KSFunctionDeclaration>()
+                .toList()
 
         val functionsByClass = mutableMapOf<KSClassDeclaration, MutableList<KSFunctionDeclaration>>()
 
@@ -73,13 +70,12 @@ class WrapperProcessor(
             functionsByClass
                 .getOrPut(classDecl) { mutableListOf() }
                 .addAll(
-                    classDecl.getDeclaredFunctions()
-                        .filter { it.validate() && it.simpleName.asString() != "<init>" },
+                    classDecl
+                        .getDeclaredFunctions()
+                        .filter { func -> func.validate() && func.simpleName.asString() != "<init>" },
                 )
         }
 
-        // Top-level functions have no enclosing class and are gathered into a single JsExportUtils
-        // object; member functions are grouped under their declaring class.
         val standaloneFunctions = mutableListOf<KSFunctionDeclaration>()
 
         functions.forEach { function ->
@@ -91,54 +87,45 @@ class WrapperProcessor(
             }
         }
 
-        functionsByClass.forEach { (cls, funcs) ->
-            ManglingHandler.checkConflicts(cls, funcs, logger)
-        }
-
         functionsByClass.forEach { (classDecl, funcs) ->
+            ManglingHandler.checkConflicts(classDecl, funcs, logger)
             generateWrapper(classDecl, funcs.distinct())
         }
 
-        if (standaloneFunctions.isNotEmpty()) {
-            val distinct = standaloneFunctions.distinct()
+        val distinct = standaloneFunctions.distinct()
+        if (distinct.isNotEmpty()) {
             ManglingHandler.checkConflicts(null, distinct, logger)
             generateUtils(distinct)
         }
 
-        if (mapHandler.hasConversions()) {
-            mapHandler.generateTypeConversion(codeGenerator)
-            mapHandler.clear()
-        }
+        mapHandler.generateTypeConversion(codeGenerator)
+        mapHandler.clear()
 
         return emptyList()
     }
 
     /**
      * Generates a `{ClassName}Js` wrapper object for [serviceClass], exposing [functions] with
-     * JS-compatible types. Suspend functions are wrapped in `Promise`; type conversions are
+     * JS-compatible types. Suspend functions are wrapped in `Promise`. Type conversions are
      * delegated to the relevant handlers.
      *
-     * When [serviceClass] is itself a value class (annotated with `@JsExportClass`), no `service`
-     * property is generated. Instead, each exported function receives the underlying value as an
-     * implicit first parameter (named after the class, lower-camel-cased) and constructs the value
-     * class on every call — mirroring how JS callers work with the raw underlying type.
+     * When [serviceClass] is itself a value class annotated with `@JsExportClass`, no `service`
+     * property is generated. Each exported function receives the underlying value as an implicit
+     * first parameter, named after the class in lower-camel-case, and constructs the value class
+     * on every call so that JS callers work with the raw underlying type.
      */
-    private fun generateWrapper(serviceClass: KSClassDeclaration, functions: List<KSFunctionDeclaration>) {
+    private fun generateWrapper(
+        serviceClass: KSClassDeclaration,
+        functions: List<KSFunctionDeclaration>,
+    ) {
         pendingImports.clear()
+        pendingConversionImports.clear()
         val wrapperName = "${serviceClass.simpleName.asString()}Js"
         val isObject = serviceClass.classKind == ClassKind.OBJECT
         val isValueClass = Modifier.VALUE in serviceClass.modifiers
 
-        val classBuilder = TypeSpec
-            .objectBuilder(wrapperName)
-            .addAnnotation(ClassName("kotlin.js", "JsExport"))
-            .addAnnotation(
-                AnnotationSpec.builder(ClassName("kotlin", "OptIn"))
-                    .addMember("%T::class", ClassName("kotlin.js", "ExperimentalJsExport"))
-                    .build(),
-            )
+        val classBuilder = jsExportObjectBuilder(wrapperName)
 
-        // Value classes are constructed per-call from the underlying value — no shared instance.
         if (!isValueClass) {
             classBuilder.addProperty(
                 PropertySpec
@@ -148,25 +135,21 @@ class WrapperProcessor(
             )
         }
 
-        // When the annotated class is itself a value class, every generated function takes the
-        // underlying value as its first argument (named after the class, lower-camel-cased) so
-        // that JS callers pass the primitive type rather than a Kotlin wrapper object.
-        val valueClassSelf: Pair<String, TypeMapping>? = if (isValueClass) {
-            val underlyingParam = serviceClass.primaryConstructor!!.parameters.first()
-            val selfParamName = serviceClass.simpleName.asString().replaceFirstChar { it.lowercase() }
-            selfParamName to resolveMapping(underlyingParam.type.resolve())
-        } else null
+        val valueClassSelf: Pair<String, TypeMapping>? =
+            if (isValueClass) {
+                val underlyingParam = serviceClass.primaryConstructor!!.parameters.first()
+                val selfParamName = serviceClass.simpleName.asString().replaceFirstChar { char -> char.lowercase() }
+                selfParamName to resolveMapping(underlyingParam.type.resolve())
+            } else {
+                null
+            }
+        // The value class's own underlying value is emitted through toKotlin in each call.
+        valueClassSelf?.let { (_, mapping) -> pendingConversionImports.addAll(mapping.importsForToKotlin) }
 
-        if (SuspendHandler.needsScope(functions)) {
-            classBuilder.addProperty(
-                PropertySpec
-                    .builder("scope", ClassName("kotlinx.coroutines", "CoroutineScope"), KModifier.PRIVATE)
-                    .initializer("%T()", ClassName("kotlinx.coroutines", "MainScope"))
-                    .build(),
-            )
-        }
+        addScopeIfNeeded(classBuilder, functions)
 
-        val leadingParams = valueClassSelf?.let { (name, mapping) -> listOf(ParameterSpec(name, mapping.jsTypeName)) } ?: emptyList()
+        val leadingParams =
+            valueClassSelf?.let { (name, mapping) -> listOf(ParameterSpec(name, mapping.jsTypeName)) } ?: emptyList()
 
         functions.forEach { func ->
             val originalName = func.simpleName.asString()
@@ -182,54 +165,32 @@ class WrapperProcessor(
             )
         }
 
-        val fileSpec = FileSpec.builder(serviceClass.packageName.asString(), wrapperName)
-            .addImport("", "toMap", "toJson")
-            .addImport("kotlin.js", "Json")
-            .addImport("kotlinx.coroutines", "promise")
+        val fileSpec =
+            FileSpec
+                .builder(serviceClass.packageName.asString(), wrapperName)
+                .apply {
+                    if (pendingConversionImports.isNotEmpty()) addImport("kotlin.js", "Json")
+                    if (SuspendHandler.needsScope(functions)) addImport("kotlinx.coroutines", "promise")
+                }
 
-        pendingImports.forEach { className ->
-            if (className.packageName.isNotEmpty()) {
-                fileSpec.addImport(className.packageName, className.simpleName)
-            }
-        }
-
-        fileSpec
-            .addType(classBuilder.build())
-            .build()
-            .writeTo(codeGenerator, aggregating = false)
+        writeFile(fileSpec, classBuilder)
     }
 
     /**
-     * Generates the shared `JsExportUtils` object for top-level [functions] annotated with
-     * [annotations.JsExportFunction]. Unlike [generateWrapper] there is no `service` instance:
-     * each function delegates to the original top-level function directly, importing it from its
-     * source package. All standalone functions across every source file land in this one object.
+     * Generates `JsExportUtils.kt` collecting all standalone [functions] annotated with
+     * [annotations.JsExportFunction] into a single `JsExportUtils` object.
+     * Only called when at least one such function exists.
      */
     private fun generateUtils(functions: List<KSFunctionDeclaration>) {
         pendingImports.clear()
+        pendingConversionImports.clear()
         val wrapperName = "JsExportUtils"
 
-        val classBuilder = TypeSpec
-            .objectBuilder(wrapperName)
-            .addAnnotation(ClassName("kotlin.js", "JsExport"))
-            .addAnnotation(
-                AnnotationSpec.builder(ClassName("kotlin", "OptIn"))
-                    .addMember("%T::class", ClassName("kotlin.js", "ExperimentalJsExport"))
-                    .build(),
-            )
-
-        if (SuspendHandler.needsScope(functions)) {
-            classBuilder.addProperty(
-                PropertySpec
-                    .builder("scope", ClassName("kotlinx.coroutines", "CoroutineScope"), KModifier.PRIVATE)
-                    .initializer("%T()", ClassName("kotlinx.coroutines", "MainScope"))
-                    .build(),
-            )
-        }
+        val classBuilder = jsExportObjectBuilder(wrapperName)
+        addScopeIfNeeded(classBuilder, functions)
 
         functions.forEach { func ->
             val originalName = func.simpleName.asString()
-            // Import the top-level function so the unqualified call resolves in the generated file.
             val packageName = func.packageName.asString()
             if (packageName.isNotEmpty()) pendingImports.add(ClassName(packageName, originalName))
 
@@ -238,17 +199,68 @@ class WrapperProcessor(
             )
         }
 
-        val fileSpec = FileSpec.builder("", wrapperName)
-            .addImport("", "toMap", "toJson")
-            .addImport("kotlin.js", "Json")
-            .addImport("kotlinx.coroutines", "promise")
+        val fileSpec =
+            FileSpec
+                .builder("", wrapperName)
+                .apply {
+                    if (pendingConversionImports.isNotEmpty()) addImport("kotlin.js", "Json")
+                    if (SuspendHandler.needsScope(functions)) addImport("kotlinx.coroutines", "promise")
+                }
 
+        writeFile(fileSpec, classBuilder)
+    }
+
+    /**
+     * Creates the base `@JsExport object` builder with the mandatory
+     * `@OptIn(ExperimentalJsExport::class)` opt-in, shared by every generated wrapper.
+     */
+    private fun jsExportObjectBuilder(name: String): TypeSpec.Builder =
+        TypeSpec
+            .objectBuilder(name)
+            .addAnnotation(ClassName("kotlin.js", "JsExport"))
+            .addAnnotation(
+                AnnotationSpec
+                    .builder(ClassName("kotlin", "OptIn"))
+                    .addMember("%T::class", ClassName("kotlin.js", "ExperimentalJsExport"))
+                    .build(),
+            )
+
+    /**
+     * Adds a private `MainScope()` backed `CoroutineScope` property to [builder] when any of
+     * [functions] is a suspend function and therefore needs `scope.promise { }`.
+     */
+    private fun addScopeIfNeeded(
+        builder: TypeSpec.Builder,
+        functions: List<KSFunctionDeclaration>,
+    ) {
+        if (SuspendHandler.needsScope(functions)) {
+            builder.addProperty(
+                PropertySpec
+                    .builder("scope", ClassName("kotlinx.coroutines", "CoroutineScope"), KModifier.PRIVATE)
+                    .initializer("%T()", ClassName("kotlinx.coroutines", "MainScope"))
+                    .build(),
+            )
+        }
+    }
+
+    /**
+     * Applies the accumulated [pendingImports] and [pendingConversionImports] to [fileSpec], attaches
+     * the built [classBuilder], and writes the resulting file to the KSP output. Map conversion
+     * functions are imported only when the file actually references a map type, so wrappers with no
+     * map boundary do not import from the possibly absent `kotlintojs.generated` package.
+     */
+    private fun writeFile(
+        fileSpec: FileSpec.Builder,
+        classBuilder: TypeSpec.Builder,
+    ) {
         pendingImports.forEach { className ->
             if (className.packageName.isNotEmpty()) {
                 fileSpec.addImport(className.packageName, className.simpleName)
             }
         }
-
+        pendingConversionImports.forEach { name ->
+            fileSpec.addImport("kotlintojs.generated", name)
+        }
         fileSpec
             .addType(classBuilder.build())
             .build()
@@ -272,20 +284,31 @@ class WrapperProcessor(
     ): FunSpec {
         val isSuspend = func.modifiers.contains(Modifier.SUSPEND)
         val returnMapping = resolveMapping(func.returnType!!.resolve())
-        val finalReturn: TypeName = if (isSuspend) SuspendHandler.buildReturnType(returnMapping) else returnMapping.jsTypeName
+        // The return value is always emitted through toJs, so only its toJs-side imports are needed.
+        pendingConversionImports.addAll(returnMapping.importsForToJs)
+        val finalReturn: TypeName =
+            if (isSuspend) SuspendHandler.buildReturnType(returnMapping) else returnMapping.jsTypeName
 
-        val params = func.parameters.map {
-            ParameterSpec(it.name!!.asString(), resolveMapping(it.type.resolve()).jsTypeName)
-        }
+        val paramMappings = func.parameters.map { param -> param to resolveMapping(param.type.resolve()) }
+        // Parameters are always emitted through toKotlin, so only their toKotlin-side imports are needed.
+        paramMappings.forEach { (_, mapping) -> pendingConversionImports.addAll(mapping.importsForToKotlin) }
 
-        val args = func.parameters.joinToString(", ") {
-            resolveMapping(it.type.resolve()).toKotlin(it.name!!.asString())
-        }
+        val params =
+            paramMappings.map { (param, mapping) ->
+                ParameterSpec(param.name!!.asString(), mapping.jsTypeName)
+            }
+
+        val args =
+            paramMappings.joinToString(", ") { (param, mapping) ->
+                mapping.toKotlin(param.name!!.asString())
+            }
 
         val call = buildCall(args)
-        val body = if (isSuspend) SuspendHandler.buildBody(call, returnMapping) else "return ${returnMapping.fromKotlin(call)}"
+        val body =
+            if (isSuspend) SuspendHandler.buildBody(call, returnMapping) else "return ${returnMapping.toJs(call)}"
 
-        return FunSpec.builder(ManglingHandler.getExportedName(func))
+        return FunSpec
+            .builder(ManglingHandler.getExportedName(func))
             .addParameters(leadingParams + params)
             .returns(finalReturn)
             .addStatement(body)
@@ -296,14 +319,27 @@ class WrapperProcessor(
      * Resolves a Kotlin [KSType] to a [TypeMapping] by delegating to the first handler that
      * claims it. Falls back to a passthrough mapping for types with native JS equivalents.
      */
-    private fun resolveMapping(type: KSType): TypeMapping = when {
-        ValueClassHandler.handles(type) -> {
-            pendingImports.add((type.declaration as KSClassDeclaration).toClassName())
-            ValueClassHandler.resolveMapping(type, ::resolveMapping)
+    private fun resolveMapping(type: KSType): TypeMapping =
+        when {
+            ValueClassHandler.handles(type) -> {
+                pendingImports.add((type.declaration as KSClassDeclaration).toClassName())
+                ValueClassHandler.resolveMapping(type, ::resolveMapping)
+            }
+
+            longHandler.handles(type) -> {
+                longHandler.resolveMapping()
+            }
+
+            collectionHandler.handles(type) -> {
+                collectionHandler.resolveMapping(type)
+            }
+
+            mapHandler.handles(type) -> {
+                mapHandler.resolveMapping(type)
+            }
+
+            else -> {
+                TypeMapping(jsTypeName = type.toTypeName())
+            }
         }
-        longHandler.handles(type) -> longHandler.resolveMapping()
-        collectionHandler.handles(type) -> collectionHandler.resolveMapping(type)
-        mapHandler.handles(type) -> mapHandler.resolveMapping(type)
-        else -> TypeMapping(jsTypeName = type.toTypeName())
-    }
 }

@@ -26,11 +26,11 @@ class LongProcessorTests : BaseProcessorTest() {
         val messages = compileWithMessages(source)
 
         assertTrue(
-            messages.any { it.contains("Long is not supported at @JsExport boundaries") },
+            messages.any { message -> message.contains("Long is not supported at @JsExport boundaries") },
             "Should report a build warning explaining the BigInt requirement",
         )
         assertTrue(
-            messages.any { it.contains("longAsBigInt") },
+            messages.any { message -> message.contains("longAsBigInt") },
             "Warning message should mention the longAsBigInt plugin option",
         )
     }
@@ -51,7 +51,7 @@ class LongProcessorTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), bigint)
-        val wrapperCode = files.single { it.name == "LongServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="LongServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("id: Long"), "Long parameter should stay Long in BigInt mode")
         assertFalse(wrapperCode.contains("toLong()"), "Should not call toLong() in BigInt mode")
@@ -74,12 +74,15 @@ class LongProcessorTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), bigint)
-        val wrapperCode = files.single { it.name == "LongServiceJs.kt" }.readText()
-        val conversionsCode = files.single { it.name == "TypeConversion.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="LongServiceJs.kt" }.readText()
+        val conversionsCode = files.single { file -> file.name =="TypeConversion.kt" }.readText()
 
         assertTrue(wrapperCode.contains("Json"), "Map return should be exposed as Json")
-        assertTrue(wrapperCode.contains("toJson1()"), "Should use typed toJson conversion")
-        assertTrue(conversionsCode.contains("Map<Long, List<Long>>"), "TypeConversion should keep Kotlin types")
+        assertTrue(wrapperCode.contains("toJson1()"), "Should call the map's encode function")
+        assertTrue(
+            conversionsCode.contains("fun Json.toMap1()"),
+            "TypeConversion should contain the map decode function",
+        )
         assertFalse(conversionsCode.contains("toDouble()"), "BigInt mode should not emit toDouble() in map conversions")
     }
 
@@ -99,12 +102,12 @@ class LongProcessorTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), bigint)
-        val wrapperCode = files.single { it.name == "LongServiceJs.kt" }.readText()
-        val conversionsCode = files.single { it.name == "TypeConversion.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="LongServiceJs.kt" }.readText()
+        val conversionsCode = files.single { file -> file.name =="TypeConversion.kt" }.readText()
 
         assertTrue(wrapperCode.contains("values: Array<Long>"), "List<Long> parameter should become Array<Long> in BigInt mode")
         assertTrue(wrapperCode.contains("values.toList()"), "Should still call toList() to convert the array back")
-        assertTrue(wrapperCode.contains("toJson1()"), "Should use typed toJson conversion for the map return")
+        assertTrue(wrapperCode.contains("toJson1()"), "Should call the map's encode function for the return")
         assertFalse(conversionsCode.contains("toDouble()"), "BigInt mode should not convert Long to Double anywhere")
     }
 }

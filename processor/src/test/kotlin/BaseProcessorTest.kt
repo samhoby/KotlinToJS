@@ -39,7 +39,7 @@ abstract class BaseProcessorTest {
         compilation.compile()
         return compilation.kspSourcesDir
             .walkTopDown()
-            .filter { it.isFile }
+            .filter { file -> file.isFile }
             .toList()
     }
 

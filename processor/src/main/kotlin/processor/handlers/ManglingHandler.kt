@@ -42,10 +42,10 @@ internal object ManglingHandler {
         functions: List<KSFunctionDeclaration>,
         logger: KSPLogger,
     ) {
-        functions.groupBy { it.simpleName.asString() }.forEach { (originalName, overloads) ->
+        functions.groupBy { func -> func.simpleName.asString() }.forEach { (originalName, overloads) ->
             if (overloads.size > 1) {
                 overloads.forEach { func ->
-                    if (func.annotations.none { it.shortName.asString() == "JsName" }) {
+                    if (func.annotations.none { annotation -> annotation.shortName.asString() == "JsName" }) {
                         logger.error(
                             "Kotlin/JS name mangling conflict: Overloaded function '$originalName' must be annotated with @JsName(\"uniqueName\").",
                             func,

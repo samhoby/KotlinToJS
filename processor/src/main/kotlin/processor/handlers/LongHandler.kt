@@ -47,7 +47,7 @@ internal class LongHandler(
             return TypeMapping(
                 jsTypeName = doubleTypeName,
                 toKotlin = { name -> "($name).toLong()" },
-                fromKotlin = { expr -> "($expr).toDouble()" },
+                toJs = { expr -> "($expr).toDouble()" },
             )
         }
         return TypeMapping(jsTypeName = longTypeName)

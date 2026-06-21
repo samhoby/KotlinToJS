@@ -24,7 +24,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        assertTrue(files.any { it.name == "OrderServiceJs.kt" }, "Should generate wrapper for non-annotated class")
+        assertTrue(files.any { file -> file.name =="OrderServiceJs.kt" }, "Should generate wrapper for non-annotated class")
     }
 
     @Test
@@ -45,7 +45,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "OrderServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="OrderServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("fun exportedOp()"), "Annotated function should be in wrapper")
         assertFalse(wrapperCode.contains("fun internalOp()"), "Non-annotated function should be excluded")
@@ -72,7 +72,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperFiles = files.filter { it.name == "OrderServiceJs.kt" }
+        val wrapperFiles = files.filter { file -> file.name =="OrderServiceJs.kt" }
         assertEquals(1, wrapperFiles.size, "Should produce exactly one wrapper file")
 
         val wrapperCode = wrapperFiles.first().readText()
@@ -97,7 +97,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), mapOf("longAsBigInt" to "true"))
-        val wrapperCode = files.single { it.name == "PaymentServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="PaymentServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("amount: Long"), "Long parameter should stay Long in BigInt mode")
         assertFalse(wrapperCode.contains("toLong()"), "Should not call toLong() in BigInt mode")
@@ -120,14 +120,14 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "CatalogServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="CatalogServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("Array<String>"), "List return should become Array")
         assertTrue(wrapperCode.contains("toTypedArray()"), "Should call toTypedArray()")
     }
 
     @Test
-    fun `should apply Map conversion on @JsExportFunction and generate TypeConversion`() {
+    fun `should apply Map conversion on @JsExportFunction and add helpers to JsExportUtils`() {
         val source =
             SourceFile.kotlin(
                 "ConfigService.kt",
@@ -142,11 +142,11 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "ConfigServiceJs.kt" }.readText()
-        val typeConversion = files.find { it.name == "TypeConversion.kt" }
+        val wrapperCode = files.single { file -> file.name =="ConfigServiceJs.kt" }.readText()
+        val typeConversion = files.find { file -> file.name =="TypeConversion.kt" }
 
         assertTrue(wrapperCode.contains("Json"), "Map return should become Json")
-        assertTrue(typeConversion != null, "Should generate TypeConversion.kt for Map types")
+        assertTrue(typeConversion != null, "Should generate TypeConversion.kt with map conversion helpers")
     }
 
     @Test
@@ -169,7 +169,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "NotificationServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="NotificationServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("Promise<Boolean>"), "Suspend return should be wrapped in Promise")
         assertTrue(wrapperCode.contains("scope.promise"), "Should delegate to scope.promise")
@@ -196,7 +196,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { it.name == "UserServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="UserServiceJs.kt" }.readText()
 
         val occurrences = wrapperCode.split("fun getUser(").size - 1
         assertEquals(1, occurrences, "getUser should appear exactly once in the wrapper")
@@ -225,11 +225,11 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
 
         val files = compile(source)
 
-        assertTrue(files.any { it.name == "ServiceAJs.kt" }, "Should generate wrapper for ServiceA")
-        assertTrue(files.any { it.name == "ServiceBJs.kt" }, "Should generate wrapper for ServiceB")
+        assertTrue(files.any { file -> file.name =="ServiceAJs.kt" }, "Should generate wrapper for ServiceA")
+        assertTrue(files.any { file -> file.name =="ServiceBJs.kt" }, "Should generate wrapper for ServiceB")
 
-        val wrapperA = files.single { it.name == "ServiceAJs.kt" }.readText()
-        val wrapperB = files.single { it.name == "ServiceBJs.kt" }.readText()
+        val wrapperA = files.single { file -> file.name =="ServiceAJs.kt" }.readText()
+        val wrapperB = files.single { file -> file.name =="ServiceBJs.kt" }.readText()
 
         assertTrue(wrapperA.contains("fun opA()") && !wrapperA.contains("fun opB()"), "ServiceAJs should only contain opA")
         assertTrue(wrapperB.contains("fun opB()") && !wrapperB.contains("fun opA()"), "ServiceBJs should only contain opB")
@@ -248,18 +248,18 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
                     @JsExportFunction
                     suspend fun buildReport(ids: List<Long>): Map<String, Long> {
                         delay(1)
-                        return ids.associate { it.toString() to it }
+                        return ids.associate { id -> id.toString() to id }
                     }
                 }
                 """.trimIndent(),
             )
 
         val files = compileWithOptions(listOf(source), mapOf("longAsBigInt" to "true"))
-        val wrapperCode = files.single { it.name == "ReportServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="ReportServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("ids: Array<Long>"), "List<Long> parameter should become Array<Long> in BigInt mode")
         assertTrue(wrapperCode.contains("Promise<Json>"), "suspend Map return should become Promise<Json>")
         assertTrue(wrapperCode.contains("scope.promise"), "Should use scope.promise")
-        assertTrue(files.any { it.name == "TypeConversion.kt" }, "Should generate TypeConversion for Map")
+        assertTrue(files.any { file -> file.name =="TypeConversion.kt" }, "Should generate TypeConversion.kt with map conversion helpers")
     }
 }

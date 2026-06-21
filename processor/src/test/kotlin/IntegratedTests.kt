@@ -33,14 +33,14 @@ class IntegratedTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), bigint)
-        val wrapperCode = files.single { it.name == "IntegratedServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name =="IntegratedServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("private val service: IntegratedService = IntegratedService()"))
         assertTrue(wrapperCode.contains("private val scope: CoroutineScope = MainScope()"))
         assertTrue(wrapperCode.contains("values: Array<Long>"), "List<Long> should become Array<Long> in BigInt mode")
         assertTrue(wrapperCode.contains("values.toList()"))
         assertTrue(wrapperCode.contains("config: Json"))
-        assertTrue(wrapperCode.contains("toMap1()"))
+        assertTrue(wrapperCode.contains("config.toMap1()"))
         assertTrue(wrapperCode.contains("toJson1()"))
         assertTrue(wrapperCode.contains("ids: Array<Long>"), "Set<Long> should become Array<Long> in BigInt mode")
         assertTrue(wrapperCode.contains("ids.toSet()"))
@@ -52,7 +52,7 @@ class IntegratedTests : BaseProcessorTest() {
     }
 
     @Test
-    fun `should keep a single type conversion file for mixed integrated sources`() {
+    fun `should keep a single TypeConversion file for mixed integrated sources`() {
         val collectionsFile =
             SourceFile.kotlin(
                 "CollectionsCoreService.kt",
@@ -86,15 +86,15 @@ class IntegratedTests : BaseProcessorTest() {
 
         val generatedFiles = compileWithOptions(listOf(collectionsFile, suspendFile), bigint)
 
-        val typeConversionFiles = generatedFiles.filter { it.name == "TypeConversion.kt" }
-        assertEquals(1, typeConversionFiles.size, "Should generate a single TypeConversion.kt")
+        val conversionFiles = generatedFiles.filter { file -> file.name =="TypeConversion.kt" }
+        assertEquals(1, conversionFiles.size, "Should generate a single TypeConversion.kt regardless of how many map signatures appear")
 
-        val collectionsWrapper = generatedFiles.single { it.name == "CollectionsCoreServiceJs.kt" }.readText()
+        val collectionsWrapper = generatedFiles.single { file -> file.name =="CollectionsCoreServiceJs.kt" }.readText()
         assertTrue(collectionsWrapper.contains("payload: Json"))
-        assertTrue(collectionsWrapper.contains("toMap1()"))
+        assertTrue(collectionsWrapper.contains("payload.toMap1()"))
         assertTrue(collectionsWrapper.contains("toJson1()"))
 
-        val suspendWrapper = generatedFiles.single { it.name == "SuspendLongServiceJs.kt" }.readText()
+        val suspendWrapper = generatedFiles.single { file -> file.name =="SuspendLongServiceJs.kt" }.readText()
         assertTrue(suspendWrapper.contains("private val scope: CoroutineScope = MainScope()"))
         assertTrue(
             suspendWrapper.contains("Promise<Array<Long>>"),
@@ -102,13 +102,25 @@ class IntegratedTests : BaseProcessorTest() {
         )
         assertTrue(suspendWrapper.contains("ids.toSet()"))
         assertTrue(suspendWrapper.contains("payload: Json"))
-        assertTrue(suspendWrapper.contains("toMap2()"))
+        assertTrue(suspendWrapper.contains("payload.toMap2()"))
         assertTrue(suspendWrapper.contains("toJson2()"))
 
-        val conversionsCode = typeConversionFiles.first().readText()
-        assertTrue(conversionsCode.contains("fun Json.toMap1()"))
-        assertTrue(conversionsCode.contains("fun Json.toMap2()"))
-        assertTrue(conversionsCode.contains("toJson1(): Json"))
-        assertTrue(conversionsCode.contains("toJson2(): Json"))
+        val conversionsCode = conversionFiles.first().readText()
+        assertTrue(
+            conversionsCode.contains("fun Json.toMap1()"),
+            "TypeConversion.kt should contain the first map's decode function",
+        )
+        assertTrue(
+            conversionsCode.contains("fun Json.toMap2()"),
+            "TypeConversion.kt should contain the second map's decode function with a distinct ID",
+        )
+        assertTrue(
+            conversionsCode.contains("toJson1(): Json"),
+            "TypeConversion.kt should contain the first map's encode function",
+        )
+        assertTrue(
+            conversionsCode.contains("toJson2(): Json"),
+            "TypeConversion.kt should contain the second map's encode function with a distinct ID",
+        )
     }
 }

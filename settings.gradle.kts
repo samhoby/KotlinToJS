@@ -1,4 +1,4 @@
-rootProject.name = "KotlinToJS"
+rootProject.name = "pt.kotlintojs"
 
 include(":annotations")
 include(":processor")

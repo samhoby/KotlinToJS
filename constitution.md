@@ -16,8 +16,9 @@
 - Processing pipeline: `WrapperProcessorProvider` → `WrapperProcessor.process` → `generateWrapper` → KotlinPoet → disk.
 - Each limitation handler lives in its own file under `processor/handlers/`, named after the limitation it solves (e.g., `CollectionHandler.kt`, `LongHandler.kt`, `SuspendHandler.kt`, `MapHandler.kt`, `ValueClassHandler.kt`). `WrapperProcessor` orchestrates them but contains no conversion logic itself.
 - Type conversion logic is self-contained in `types/TypeMapping` and the respective handler. Do not scatter conversion decisions across files.
-- `TypeConversion.kt` is only generated when `Map` types are present. Never generate it when no `Map` types are present.
-- Standalone `@JsExportFunction`s (outside any class scope) must be collected into a single `JsExportUtils` object in one file, regardless of how many source files they come from.
+- When at least one `Map` type appears at a boundary, `MapHandler` writes a separate `TypeConversion.kt` in package `kotlintojs.generated`, containing one decode/encode function pair per distinct map signature encountered in the processing round. Each pair is named after its signature (for example `Json.toMap1()` and `Map<String, Long>.toJson1()`) rather than sharing a single name, because Kotlin cannot overload by return type: two `Json.toMap()` functions differing only in their `Map` return type are a compile error. Nested map signatures are registered recursively so the inner pair always exists. Wrappers import only the conversion functions they reference. See `docs/adr/2026-06-21-distinct-map-conversion-names.md`.
+- `JsExportUtils.kt` is the shared file for standalone `@JsExportFunction`s: it is written only when at least one such function exists and always contains the `JsExportUtils` object. It never holds map conversion helpers.
+- Standalone `@JsExportFunction`s (outside any class scope) must be collected into the `JsExportUtils` object in `JsExportUtils.kt`, regardless of how many source files they come from.
 - Generated wrapper names follow the convention `{OriginalName}Js` and are always `@JsExport object`s with `@OptIn(ExperimentalJsExport::class)`.
 - Handle `object` vs `class` kind at generation time: objects must not be instantiated with `()`.
 - When `@JsExportClass` is placed on a value class itself, `generateWrapper` omits the `service` property and instead prepends the underlying value as the first parameter of every generated function (named after the class, lower-camel-cased). The value class is constructed per-call inside each function body.
@@ -28,7 +29,7 @@
 - Never expose `Long`, `List`, `Set`, `Map`, value classes, or other unsupported types directly in `@JsExport` declarations. Always convert at the wrapper boundary.
 - Never silently convert `Long` to `Double`: `LongHandler` must emit a build **warning** with BigInt guidance when `Long` appears at a direct export boundary and `longAsBigInt` is not set. The build still succeeds with a `Double` fallback. The conversion must never happen without the warning.
 - The `longAsBigInt` KSP option (`ksp { arg("longAsBigInt", "true") }`) activates BigInt passthrough mode. Consumers must also add `"-Xes-long-as-bigint"` to their Kotlin/JS `freeCompilerArgs` and target ES2015.
-- Never generate multiple `TypeConversion.kt` files in a single processing round.
+- Never generate more than one `TypeConversion.kt` or more than one `JsExportUtils.kt` per processing round.
 - Never silently swallow a name-mangling conflict. Log an error via `KSPLogger` and let the build fail.
 - Never leave public annotation semantics or processor entry points without KDoc.
 - Never publish a breaking change to the plugin without a major version bump.
