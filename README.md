@@ -21,8 +21,6 @@ processor generates the conversion layer. Your Kotlin code stays unchanged.
   - [@JsExportClass vs @JsExport](#jsexportclass-vs-jsexport)
 - [Getting Started](#getting-started)
   - [Installation](#installation)
-    - [Gradle Plugin (recommended)](#gradle-plugin-recommended)
-    - [Manual KSP setup](#manual-ksp-setup)
   - [Where does generated code go?](#where-does-generated-code-go)
   - [Full example setup](#full-example-setup)
 - [Limitations](#limitations)
@@ -222,7 +220,7 @@ Full behaviour of each conversion is documented in [Limitations](#limitations).
 
 ### Custom type replacement
 
-`Either<ProblemDetail, T>` is a sealed class, and sealed classes do not cross the `@JsExport`
+`Either<E, T>` is a sealed class, and sealed classes do not cross the `@JsExport`
 boundary cleanly: TypeScript would receive Kotlin's mangled subclass names instead of a usable
 discriminated union. `@JsExportReplacement` solves this by declaring a flat, JS-friendly stand-in
 class, and `@JsExportConverter` marks the companion function that converts from the original type.
@@ -315,8 +313,6 @@ types require manual conversion. With this plugin, annotating with `@JsExportCla
 
 ### Installation
 
-#### Gradle Plugin (recommended)
-
 Apply the `io.github.samhoby.kotlintojs` plugin. It automatically applies KSP and wires the annotations and processor:
 
 ```kotlin
@@ -345,45 +341,12 @@ kotlin {
 > processor to `kspJs`. You do not add them to your dependencies by hand. They resolve from Maven
 > Central, so keep `mavenCentral()` in your repositories.
 
-#### Manual KSP setup
-
 The plugin ships as **two artefacts**:
 
 | Artifact                    | What it is                                                                                 | Where it goes                         |
 |-----------------------------|--------------------------------------------------------------------------------------------|---------------------------------------|
 | `io.github.samhoby:annotations` | The `@JsExportClass` / `@JsExportFunction` annotations, multiplatform for jvm, js, and ios | `commonMain` or `jsMain` dependencies |
 | `io.github.samhoby:processor`   | The KSP processor that generates the wrappers, JVM only                                    | `add("kspJs", ...)`                   |
-
-Apply `com.google.devtools.ksp` and wire both:
-
-```kotlin
-// build.gradle.kts
-plugins {
-    kotlin("multiplatform") version "2.1.0"
-    id("com.google.devtools.ksp") version "2.1.0-1.0.29"
-}
-
-kotlin {
-    js(IR) {
-        browser()   // or nodejs
-        binaries.executable()
-    }
-    // your other targets here, such as jvm or iosArm64
-
-    sourceSets {
-        commonMain.dependencies {
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
-            // Annotations are visible from common code on every target
-            implementation("io.github.samhoby:annotations:<version>")
-        }
-    }
-}
-
-dependencies {
-    // Processor runs on the JS target only. Other targets are unaffected
-    add("kspJs", "io.github.samhoby:processor:<version>")
-}
-```
 
 The `@JsExportClass` and `@JsExportFunction` annotations can be placed in `commonMain` or `jsMain`. The processor runs for the JS compilation regardless of where the annotations are placed.
 
