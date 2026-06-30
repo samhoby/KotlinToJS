@@ -1,10 +1,12 @@
-rootProject.name = "pt.kotlintojs"
+rootProject.name = "KotlinToJS"
 
 include(":annotations")
 include(":processor")
+include(":gradle-plugin")
 
 pluginManagement {
     repositories {
+        google()
         mavenCentral()
         gradlePluginPortal()
     }
@@ -12,6 +14,7 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositories {
+        google()
         mavenCentral()
     }
 }

@@ -1,11 +1,11 @@
-package processor.handlers
+package io.github.samhoby.kotlintojs.processor.handlers
 
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.Modifier
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.TypeName
-import types.TypeMapping
+import io.github.samhoby.kotlintojs.processor.types.TypeMapping
 
 /**
  * Handles suspend function → `Promise<T>` boundary conversion.

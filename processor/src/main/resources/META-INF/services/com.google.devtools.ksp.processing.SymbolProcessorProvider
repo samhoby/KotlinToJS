@@ -1,1 +1,1 @@
-processor.WrapperProcessorProvider
+io.github.samhoby.kotlintojs.processor.WrapperProcessorProvider

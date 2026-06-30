@@ -1,7 +1,6 @@
-package processor
-
 import com.tschuchort.compiletesting.SourceFile
 import org.junit.jupiter.api.Test
+import io.github.samhoby.kotlintojs.tests.BaseProcessorTest
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -13,7 +12,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "OrderService.kt",
                 """
-                import annotations.JsExportFunction
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
 
                 class OrderService {
                     @JsExportFunction
@@ -24,7 +23,10 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        assertTrue(files.any { file -> file.name =="OrderServiceJs.kt" }, "Should generate wrapper for non-annotated class")
+        assertTrue(
+            files.any { file -> file.name == "OrderServiceJs.kt" },
+            "Should generate wrapper for non-annotated class",
+        )
     }
 
     @Test
@@ -33,7 +35,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "OrderService.kt",
                 """
-                import annotations.JsExportFunction
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
 
                 class OrderService {
                     @JsExportFunction
@@ -45,7 +47,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { file -> file.name =="OrderServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "OrderServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("fun exportedOp()"), "Annotated function should be in wrapper")
         assertFalse(wrapperCode.contains("fun internalOp()"), "Non-annotated function should be excluded")
@@ -57,7 +59,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "OrderService.kt",
                 """
-                import annotations.JsExportFunction
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
 
                 class OrderService {
                     @JsExportFunction
@@ -72,7 +74,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperFiles = files.filter { file -> file.name =="OrderServiceJs.kt" }
+        val wrapperFiles = files.filter { file -> file.name == "OrderServiceJs.kt" }
         assertEquals(1, wrapperFiles.size, "Should produce exactly one wrapper file")
 
         val wrapperCode = wrapperFiles.first().readText()
@@ -87,7 +89,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "PaymentService.kt",
                 """
-                import annotations.JsExportFunction
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
 
                 class PaymentService {
                     @JsExportFunction
@@ -97,7 +99,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), mapOf("longAsBigInt" to "true"))
-        val wrapperCode = files.single { file -> file.name =="PaymentServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "PaymentServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("amount: Long"), "Long parameter should stay Long in BigInt mode")
         assertFalse(wrapperCode.contains("toLong()"), "Should not call toLong() in BigInt mode")
@@ -110,7 +112,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CatalogService.kt",
                 """
-                import annotations.JsExportFunction
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
 
                 class CatalogService {
                     @JsExportFunction
@@ -120,7 +122,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { file -> file.name =="CatalogServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "CatalogServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("Array<String>"), "List return should become Array")
         assertTrue(wrapperCode.contains("toTypedArray()"), "Should call toTypedArray()")
@@ -132,7 +134,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "ConfigService.kt",
                 """
-                import annotations.JsExportFunction
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
 
                 class ConfigService {
                     @JsExportFunction
@@ -142,8 +144,8 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { file -> file.name =="ConfigServiceJs.kt" }.readText()
-        val typeConversion = files.find { file -> file.name =="TypeConversion.kt" }
+        val wrapperCode = files.single { file -> file.name == "ConfigServiceJs.kt" }.readText()
+        val typeConversion = files.find { file -> file.name == "TypeConversion.kt" }
 
         assertTrue(wrapperCode.contains("Json"), "Map return should become Json")
         assertTrue(typeConversion != null, "Should generate TypeConversion.kt with map conversion helpers")
@@ -155,7 +157,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "NotificationService.kt",
                 """
-                import annotations.JsExportFunction
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
                 import kotlinx.coroutines.delay
 
                 class NotificationService {
@@ -169,7 +171,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { file -> file.name =="NotificationServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "NotificationServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("Promise<Boolean>"), "Suspend return should be wrapped in Promise")
         assertTrue(wrapperCode.contains("scope.promise"), "Should delegate to scope.promise")
@@ -182,8 +184,8 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "UserService.kt",
                 """
-                import annotations.JsExportClass
-                import annotations.JsExportFunction
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
 
                 @JsExportClass
                 class UserService {
@@ -196,11 +198,14 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { file -> file.name =="UserServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "UserServiceJs.kt" }.readText()
 
         val occurrences = wrapperCode.split("fun getUser(").size - 1
         assertEquals(1, occurrences, "getUser should appear exactly once in the wrapper")
-        assertTrue(wrapperCode.contains("fun listUsers()"), "Non-annotated function should still be included via @JsExportClass")
+        assertTrue(
+            wrapperCode.contains("fun listUsers()"),
+            "Non-annotated function should still be included via @JsExportClass",
+        )
     }
 
     @Test
@@ -209,7 +214,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "Services.kt",
                 """
-                import annotations.JsExportFunction
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
 
                 class ServiceA {
                     @JsExportFunction
@@ -225,14 +230,20 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
 
         val files = compile(source)
 
-        assertTrue(files.any { file -> file.name =="ServiceAJs.kt" }, "Should generate wrapper for ServiceA")
-        assertTrue(files.any { file -> file.name =="ServiceBJs.kt" }, "Should generate wrapper for ServiceB")
+        assertTrue(files.any { file -> file.name == "ServiceAJs.kt" }, "Should generate wrapper for ServiceA")
+        assertTrue(files.any { file -> file.name == "ServiceBJs.kt" }, "Should generate wrapper for ServiceB")
 
-        val wrapperA = files.single { file -> file.name =="ServiceAJs.kt" }.readText()
-        val wrapperB = files.single { file -> file.name =="ServiceBJs.kt" }.readText()
+        val wrapperA = files.single { file -> file.name == "ServiceAJs.kt" }.readText()
+        val wrapperB = files.single { file -> file.name == "ServiceBJs.kt" }.readText()
 
-        assertTrue(wrapperA.contains("fun opA()") && !wrapperA.contains("fun opB()"), "ServiceAJs should only contain opA")
-        assertTrue(wrapperB.contains("fun opB()") && !wrapperB.contains("fun opA()"), "ServiceBJs should only contain opB")
+        assertTrue(
+            wrapperA.contains("fun opA()") && !wrapperA.contains("fun opB()"),
+            "ServiceAJs should only contain opA",
+        )
+        assertTrue(
+            wrapperB.contains("fun opB()") && !wrapperB.contains("fun opA()"),
+            "ServiceBJs should only contain opB",
+        )
     }
 
     @Test
@@ -241,7 +252,7 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "ReportService.kt",
                 """
-                import annotations.JsExportFunction
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
                 import kotlinx.coroutines.delay
 
                 class ReportService {
@@ -255,11 +266,17 @@ class JsExportFunctionProcessorTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), mapOf("longAsBigInt" to "true"))
-        val wrapperCode = files.single { file -> file.name =="ReportServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "ReportServiceJs.kt" }.readText()
 
-        assertTrue(wrapperCode.contains("ids: Array<Long>"), "List<Long> parameter should become Array<Long> in BigInt mode")
+        assertTrue(
+            wrapperCode.contains("ids: Array<Long>"),
+            "List<Long> parameter should become Array<Long> in BigInt mode",
+        )
         assertTrue(wrapperCode.contains("Promise<Json>"), "suspend Map return should become Promise<Json>")
         assertTrue(wrapperCode.contains("scope.promise"), "Should use scope.promise")
-        assertTrue(files.any { file -> file.name =="TypeConversion.kt" }, "Should generate TypeConversion.kt with map conversion helpers")
+        assertTrue(
+            files.any { file -> file.name == "TypeConversion.kt" },
+            "Should generate TypeConversion.kt with map conversion helpers",
+        )
     }
 }

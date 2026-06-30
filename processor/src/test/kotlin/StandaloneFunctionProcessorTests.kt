@@ -1,7 +1,6 @@
-package processor
-
 import com.tschuchort.compiletesting.SourceFile
 import org.junit.jupiter.api.Test
+import io.github.samhoby.kotlintojs.tests.BaseProcessorTest
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -12,7 +11,7 @@ class StandaloneFunctionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "Greeting.kt",
                 $$"""
-                import annotations.JsExportFunction
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
 
                 @JsExportFunction
                 fun greet(name: String): String = "Hello, $name"
@@ -33,7 +32,7 @@ class StandaloneFunctionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "First.kt",
                 """
-                import annotations.JsExportFunction
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
 
                 @JsExportFunction
                 fun alpha(): String = "a"
@@ -43,7 +42,7 @@ class StandaloneFunctionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "Second.kt",
                 """
-                import annotations.JsExportFunction
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
 
                 @JsExportFunction
                 fun beta(): String = "b"
@@ -65,7 +64,7 @@ class StandaloneFunctionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "Tags.kt",
                 """
-                import annotations.JsExportFunction
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
 
                 @JsExportFunction
                 fun tags(values: List<String>): List<String> = values
@@ -86,7 +85,7 @@ class StandaloneFunctionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "Loader.kt",
                 """
-                import annotations.JsExportFunction
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
                 import kotlinx.coroutines.delay
 
                 @JsExportFunction
@@ -114,7 +113,7 @@ class StandaloneFunctionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "Overloads.kt",
                 """
-                import annotations.JsExportFunction
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
 
                 @JsExportFunction
                 fun handle(value: String): String = value

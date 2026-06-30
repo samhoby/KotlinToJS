@@ -1,7 +1,6 @@
-package processor
-
 import com.tschuchort.compiletesting.SourceFile
 import org.junit.jupiter.api.Test
+import io.github.samhoby.kotlintojs.tests.BaseProcessorTest
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -14,7 +13,7 @@ class IntegratedTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "IntegratedService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
                 import kotlinx.coroutines.delay
 
                 @JsExportClass
@@ -33,7 +32,7 @@ class IntegratedTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), bigint)
-        val wrapperCode = files.single { file -> file.name =="IntegratedServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "IntegratedServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("private val service: IntegratedService = IntegratedService()"))
         assertTrue(wrapperCode.contains("private val scope: CoroutineScope = MainScope()"))
@@ -57,7 +56,7 @@ class IntegratedTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionsCoreService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class CollectionsCoreService {
@@ -70,7 +69,7 @@ class IntegratedTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "SuspendLongService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
                 import kotlinx.coroutines.delay
 
                 @JsExportClass
@@ -86,15 +85,15 @@ class IntegratedTests : BaseProcessorTest() {
 
         val generatedFiles = compileWithOptions(listOf(collectionsFile, suspendFile), bigint)
 
-        val conversionFiles = generatedFiles.filter { file -> file.name =="TypeConversion.kt" }
+        val conversionFiles = generatedFiles.filter { file -> file.name == "TypeConversion.kt" }
         assertEquals(1, conversionFiles.size, "Should generate a single TypeConversion.kt regardless of how many map signatures appear")
 
-        val collectionsWrapper = generatedFiles.single { file -> file.name =="CollectionsCoreServiceJs.kt" }.readText()
+        val collectionsWrapper = generatedFiles.single { file -> file.name == "CollectionsCoreServiceJs.kt" }.readText()
         assertTrue(collectionsWrapper.contains("payload: Json"))
         assertTrue(collectionsWrapper.contains("payload.toMap1()"))
         assertTrue(collectionsWrapper.contains("toJson1()"))
 
-        val suspendWrapper = generatedFiles.single { file -> file.name =="SuspendLongServiceJs.kt" }.readText()
+        val suspendWrapper = generatedFiles.single { file -> file.name == "SuspendLongServiceJs.kt" }.readText()
         assertTrue(suspendWrapper.contains("private val scope: CoroutineScope = MainScope()"))
         assertTrue(
             suspendWrapper.contains("Promise<Array<Long>>"),

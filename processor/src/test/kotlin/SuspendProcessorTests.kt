@@ -1,7 +1,6 @@
-package processor
-
 import com.tschuchort.compiletesting.SourceFile
 import org.junit.jupiter.api.Test
+import io.github.samhoby.kotlintojs.tests.BaseProcessorTest
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -12,7 +11,7 @@ class SuspendProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "SuspendService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
                 import kotlinx.coroutines.delay
 
                 @JsExportClass
@@ -33,7 +32,7 @@ class SuspendProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "SyncService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class SyncService {
@@ -53,7 +52,7 @@ class SuspendProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "SuspendService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
                 import kotlinx.coroutines.delay
 
                 @JsExportClass
@@ -79,7 +78,7 @@ class SuspendProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "SuspendService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
                 import kotlinx.coroutines.delay
 
                 @JsExportClass

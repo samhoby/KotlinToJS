@@ -1,4 +1,4 @@
-package annotations
+package io.github.samhoby.kotlintojs.annotations
 
 /**
  * Marks a class for JS export wrapper generation.

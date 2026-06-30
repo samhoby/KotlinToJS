@@ -1,7 +1,6 @@
-package processor
-
 import com.tschuchort.compiletesting.SourceFile
 import org.junit.jupiter.api.Test
+import io.github.samhoby.kotlintojs.tests.BaseProcessorTest
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -12,7 +11,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "UserService.kt",
                 $$"""
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JvmInline
                 value class UserId(val value: String)
@@ -38,7 +37,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "UserService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JvmInline
                 value class UserId(val value: String)
@@ -64,7 +63,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "OrderService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JvmInline
                 value class OrderId(val id: String)
@@ -91,7 +90,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "InvoiceService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JvmInline
                 value class InvoiceId(val id: Long)
@@ -117,7 +116,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "ShopService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JvmInline value class ProductId(val value: String)
                 @JvmInline value class Price(val cents: Int)
@@ -144,7 +143,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "UserId.kt",
                 $$"""
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JvmInline
                 @JsExportClass
@@ -171,7 +170,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "Score.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JvmInline
                 @JsExportClass
@@ -197,7 +196,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "TaskId.kt",
                 $$"""
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
                 import kotlinx.coroutines.delay
 
                 @JvmInline
@@ -228,7 +227,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "EventId.kt",
                 $$"""
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JvmInline
                 @JsExportClass
@@ -254,7 +253,7 @@ class ValueClassProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "TokenService.kt",
                 """
-                import annotations.JsExportFunction
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
 
                 @JvmInline
                 value class Token(val raw: String)

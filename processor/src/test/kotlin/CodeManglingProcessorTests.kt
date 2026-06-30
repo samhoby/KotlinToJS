@@ -1,7 +1,6 @@
-package processor
-
 import com.tschuchort.compiletesting.SourceFile
 import org.junit.jupiter.api.Test
+import io.github.samhoby.kotlintojs.tests.BaseProcessorTest
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -21,7 +20,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "MathService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class MathService {
@@ -45,7 +44,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "MathService.kt",
                 """
-                import annotations.JsExportFunction
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
 
                 class MathService {
                     @JsExportFunction
@@ -71,7 +70,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "MathService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
                 import kotlin.js.JsName
 
                 @JsExportClass
@@ -97,7 +96,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "MathService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
                 import kotlin.js.JsName
 
                 @JsExportClass
@@ -127,7 +126,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "MathService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
                 import kotlin.js.JsName
 
                 @JsExportClass
@@ -142,7 +141,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { file -> file.name =="MathServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "MathServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("fun sumInt("), "First overload should use @JsName value")
         assertTrue(wrapperCode.contains("fun sumDouble("), "Second overload should use @JsName value")
@@ -155,7 +154,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "MathService.kt",
                 """
-                import annotations.JsExportFunction
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
                 import kotlin.js.JsName
 
                 class MathService {
@@ -171,7 +170,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { file -> file.name =="MathServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "MathServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("fun sumInt("), "Int overload should be exported as sumInt")
         assertTrue(wrapperCode.contains("fun sumDouble("), "Double overload should be exported as sumDouble")
@@ -183,7 +182,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "MathService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
                 import kotlin.js.JsName
 
                 @JsExportClass
@@ -198,7 +197,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), mapOf("longAsBigInt" to "true"))
-        val wrapperCode = files.single { file -> file.name =="MathServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "MathServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("fun sumLong("), "Long overload should be renamed")
         assertTrue(wrapperCode.contains("a: Long"), "Long parameter should stay Long in BigInt mode")
@@ -213,7 +212,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "MathService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
                 import kotlin.js.JsName
                 import kotlinx.coroutines.delay
 
@@ -232,7 +231,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), mapOf("longAsBigInt" to "true"))
-        val wrapperCode = files.single { file -> file.name =="MathServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "MathServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("fun sumSync("), "Sync overload should be exported as sumSync")
         assertFalse(wrapperCode.contains("Promise<Int>"), "Sync overload should not return Promise")
@@ -248,7 +247,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "GreetService.kt",
                 $$"""
-            import annotations.JsExportClass
+            import io.github.samhoby.kotlintojs.annotations.JsExportClass
             import kotlin.js.JsName
 
             @JsExportClass
@@ -261,7 +260,7 @@ class CodeManglingProcessorTests : BaseProcessorTest() {
             )
 
         val files = compile(source)
-        val wrapperCode = files.single { file -> file.name =="GreetServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "GreetServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("fun sayHello("), "Should use @JsName value as the exported function name")
         assertFalse(wrapperCode.contains("fun greet("), "Original Kotlin name should not appear in wrapper")

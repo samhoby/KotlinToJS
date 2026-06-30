@@ -1,24 +1,31 @@
 @file:Suppress("ktlint:standard:no-wildcard-imports")
 
-package processor
+package io.github.samhoby.kotlintojs.tests
 
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.processing.SymbolProcessorProvider
 import com.tschuchort.compiletesting.*
+import io.github.samhoby.kotlintojs.processor.WrapperProcessor
+import io.github.samhoby.kotlintojs.processor.WrapperProcessorProvider
 import org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi
 import java.io.File
 import java.io.OutputStream
 
 @OptIn(ExperimentalCompilerApi::class)
 abstract class BaseProcessorTest {
-    private class OptionsProvider(private val opts: Map<String, String>) : SymbolProcessorProvider {
+    private class OptionsProvider(
+        private val opts: Map<String, String>,
+    ) : SymbolProcessorProvider {
         override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor =
-            WrapperProcessor(environment.codeGenerator, environment.logger, opts)
+            WrapperProcessor(
+                environment.codeGenerator,
+                environment.logger,
+                opts,
+            )
     }
 
-    protected fun compile(vararg sources: SourceFile): List<File> =
-        compileWithOptions(sources.toList())
+    protected fun compile(vararg sources: SourceFile): List<File> = compileWithOptions(sources.toList())
 
     /**
      * Compiles [sources] with the given KSP processor [options] and returns generated files.
@@ -71,7 +78,10 @@ abstract class BaseProcessorTest {
                 inheritClassPath = true
                 messageOutputStream = stream
                 useKsp2()
-                symbolProcessorProviders = mutableListOf(WrapperProcessorProvider())
+                symbolProcessorProviders =
+                    mutableListOf(
+                        WrapperProcessorProvider(),
+                    )
             }.compile()
         stream.flush()
         return messages

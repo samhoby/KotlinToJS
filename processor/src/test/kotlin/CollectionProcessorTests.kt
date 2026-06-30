@@ -1,9 +1,8 @@
-package processor
-
 import com.tschuchort.compiletesting.SourceFile
 import org.junit.jupiter.api.Test
-import kotlin.test.assertNotNull
+import io.github.samhoby.kotlintojs.tests.BaseProcessorTest
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CollectionProcessorTests : BaseProcessorTest() {
@@ -13,7 +12,7 @@ class CollectionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
                 
                 @JsExportClass
                 class CollectionService {
@@ -35,7 +34,7 @@ class CollectionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
                 
                 @JsExportClass
                 class CollectionService {
@@ -57,7 +56,7 @@ class CollectionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class CollectionService {
@@ -83,7 +82,7 @@ class CollectionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class CollectionService {
@@ -108,7 +107,7 @@ class CollectionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
                 
                 @JsExportClass
                 class CollectionService {
@@ -134,7 +133,7 @@ class CollectionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
                 
                 @JsExportClass
                 class CollectionService {
@@ -158,7 +157,7 @@ class CollectionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class CollectionService {
@@ -181,7 +180,7 @@ class CollectionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class CollectionService {
@@ -211,7 +210,7 @@ class CollectionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class CollectionService {
@@ -240,7 +239,7 @@ class CollectionProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
                 
                 @JsExportClass
                 class CollectionService {

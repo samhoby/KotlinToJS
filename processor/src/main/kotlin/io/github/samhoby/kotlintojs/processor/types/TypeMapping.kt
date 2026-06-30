@@ -1,4 +1,4 @@
-package types
+package io.github.samhoby.kotlintojs.processor.types
 
 import com.squareup.kotlinpoet.TypeName
 

@@ -1,9 +1,9 @@
-package processor.handlers
+package io.github.samhoby.kotlintojs.processor.handlers
 
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
-import processor.isValueClass
-import types.TypeMapping
+import io.github.samhoby.kotlintojs.processor.isValueClass
+import io.github.samhoby.kotlintojs.processor.types.TypeMapping
 
 /**
  * Handles Kotlin value (inline) classes at `@JsExport` boundaries.
@@ -33,7 +33,7 @@ internal object ValueClassHandler {
      * - **Return position**: the wrapper accesses the underlying property of the value the service
      *   returns and converts it to its JS-compatible form.
      *
-     * [resolveInner] must be [processor.WrapperProcessor]'s `resolveMapping` so that the
+     * [resolveInner] must be [io.github.samhoby.kotlintojs.processor.WrapperProcessor]'s `resolveMapping` so that the
      * underlying type itself receives the correct handler (e.g. [LongHandler] for a
      * `value class BigId(val id: Long)`).
      */

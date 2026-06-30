@@ -1,7 +1,6 @@
-package processor
-
 import com.tschuchort.compiletesting.SourceFile
 import org.junit.jupiter.api.Test
+import io.github.samhoby.kotlintojs.tests.BaseProcessorTest
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -14,7 +13,7 @@ class LongProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "LongService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class LongService {
@@ -41,7 +40,7 @@ class LongProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "LongService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class LongService {
@@ -51,7 +50,7 @@ class LongProcessorTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), bigint)
-        val wrapperCode = files.single { file -> file.name =="LongServiceJs.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "LongServiceJs.kt" }.readText()
 
         assertTrue(wrapperCode.contains("id: Long"), "Long parameter should stay Long in BigInt mode")
         assertFalse(wrapperCode.contains("toLong()"), "Should not call toLong() in BigInt mode")
@@ -64,7 +63,7 @@ class LongProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "LongService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class LongService {
@@ -74,8 +73,8 @@ class LongProcessorTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), bigint)
-        val wrapperCode = files.single { file -> file.name =="LongServiceJs.kt" }.readText()
-        val conversionsCode = files.single { file -> file.name =="TypeConversion.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "LongServiceJs.kt" }.readText()
+        val conversionsCode = files.single { file -> file.name == "TypeConversion.kt" }.readText()
 
         assertTrue(wrapperCode.contains("Json"), "Map return should be exposed as Json")
         assertTrue(wrapperCode.contains("toJson1()"), "Should call the map's encode function")
@@ -92,7 +91,7 @@ class LongProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "LongService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class LongService {
@@ -102,10 +101,13 @@ class LongProcessorTests : BaseProcessorTest() {
             )
 
         val files = compileWithOptions(listOf(source), bigint)
-        val wrapperCode = files.single { file -> file.name =="LongServiceJs.kt" }.readText()
-        val conversionsCode = files.single { file -> file.name =="TypeConversion.kt" }.readText()
+        val wrapperCode = files.single { file -> file.name == "LongServiceJs.kt" }.readText()
+        val conversionsCode = files.single { file -> file.name == "TypeConversion.kt" }.readText()
 
-        assertTrue(wrapperCode.contains("values: Array<Long>"), "List<Long> parameter should become Array<Long> in BigInt mode")
+        assertTrue(
+            wrapperCode.contains("values: Array<Long>"),
+            "List<Long> parameter should become Array<Long> in BigInt mode",
+        )
         assertTrue(wrapperCode.contains("values.toList()"), "Should still call toList() to convert the array back")
         assertTrue(wrapperCode.contains("toJson1()"), "Should call the map's encode function for the return")
         assertFalse(conversionsCode.contains("toDouble()"), "BigInt mode should not convert Long to Double anywhere")

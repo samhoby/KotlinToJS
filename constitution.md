@@ -6,13 +6,13 @@
 - Spec-driven: every non-trivial change starts with a short plan and acceptance criteria.
 - Stack: Kotlin + KSP (Symbol Processing API) + KotlinPoet for code generation.
 - Testing: compile-testing via `kctfork`. Always assert on generated code content, not just compilation success.
-- Publishing: two Maven artefacts via `maven-publish` under group `pt.kotlintojs`. `annotations` (Kotlin Multiplatform: jvm, js, ios) is consumed in the user's `commonMain`, and `processor` (JVM) is applied via `add("kspJs", ...)`. Follow semantic versioning.
+- Publishing: three artefacts under group `io.github.samhoby`. `annotations` (Kotlin Multiplatform: jvm, android, js, ios) is consumed in the user's `commonMain`, `processor` (JVM) is applied via `add("kspJs", ...)`, and the `:gradle-plugin` publishes the `io.github.samhoby.kotlintojs` plugin that wires both. Follow semantic versioning.
 - Dependencies: add only when they remove complexity. Prefer removing libs over adding.
 - KDoc is mandatory for public annotations, processor entry points, and non-obvious type mapping rules.
 
 ## 2. Architectural Patterns
 
-- Annotation declarations live in the `:annotations` module (`annotations/src/commonMain/kotlin/annotations/`) with no logic and no imports beyond Kotlin stdlib. It is a separate multiplatform artefact (published as `pt.kotlintojs:annotations`) so consumers can reference the annotations from `commonMain`. The processor lives in the JVM-only `:processor` module (published as `pt.kotlintojs:processor`).
+- Annotation declarations live in the `:annotations` module (`annotations/src/commonMain/kotlin/io/github/samhoby/kotlintojs/annotations/`) with no logic and no imports beyond Kotlin stdlib. It is a separate multiplatform artefact (published as `io.github.samhoby:annotations`) so consumers can reference the annotations from `commonMain`. The processor lives in the JVM-only `:processor` module (published as `io.github.samhoby:processor`).
 - Processing pipeline: `WrapperProcessorProvider` → `WrapperProcessor.process` → `generateWrapper` → KotlinPoet → disk.
 - Each limitation handler lives in its own file under `processor/handlers/`, named after the limitation it solves (e.g., `CollectionHandler.kt`, `LongHandler.kt`, `SuspendHandler.kt`, `MapHandler.kt`, `ValueClassHandler.kt`). `WrapperProcessor` orchestrates them but contains no conversion logic itself.
 - Type conversion logic is self-contained in `types/TypeMapping` and the respective handler. Do not scatter conversion decisions across files.

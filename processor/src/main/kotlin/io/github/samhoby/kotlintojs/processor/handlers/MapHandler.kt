@@ -1,6 +1,4 @@
-@file:Suppress("ktlint:standard:no-wildcard-imports")
-
-package processor.handlers
+package io.github.samhoby.kotlintojs.processor.handlers
 
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.KSPLogger
@@ -10,8 +8,15 @@ import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
-import processor.*
-import types.TypeMapping
+import io.github.samhoby.kotlintojs.processor.elementType
+import io.github.samhoby.kotlintojs.processor.isList
+import io.github.samhoby.kotlintojs.processor.isLong
+import io.github.samhoby.kotlintojs.processor.isMap
+import io.github.samhoby.kotlintojs.processor.isSet
+import io.github.samhoby.kotlintojs.processor.isString
+import io.github.samhoby.kotlintojs.processor.keyType
+import io.github.samhoby.kotlintojs.processor.types.TypeMapping
+import io.github.samhoby.kotlintojs.processor.valueType
 
 /**
  * Handles `Map<K, V>` ⇄ `Json` boundary conversion.
@@ -260,7 +265,7 @@ internal class MapHandler(
 
     /**
      * Produces a stable deduplication key for [type] by combining the declaration's qualified name
-     * with its type arguments recursively. Unlike [com.squareup.kotlinpoet.ksp.toTypeName] + [toString],
+     * with its type arguments recursively. Unlike [toTypeName] + [toString],
      * this is not affected by KotlinPoet/KSP formatting or qualification changes across versions.
      */
     private fun signature(type: KSType): String {

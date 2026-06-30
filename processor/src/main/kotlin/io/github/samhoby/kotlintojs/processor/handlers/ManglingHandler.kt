@@ -1,4 +1,4 @@
-package processor.handlers
+package io.github.samhoby.kotlintojs.processor.handlers
 
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.KSClassDeclaration

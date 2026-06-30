@@ -1,9 +1,9 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
-    `maven-publish`
+    alias(libs.plugins.vanniktech.maven.publish)
 }
 
-version = "0.1.0-SNAPSHOT"
+version = "0.1.0"
 
 dependencies {
     implementation(project(":annotations"))
@@ -21,18 +21,6 @@ kotlin {
     jvmToolchain(21)
 }
 
-java {
-    withSourcesJar()
-}
-
 tasks.test {
     useJUnitPlatform()
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
-        }
-    }
 }

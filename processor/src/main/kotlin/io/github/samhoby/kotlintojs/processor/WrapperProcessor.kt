@@ -1,9 +1,7 @@
 @file:Suppress("ktlint:standard:no-wildcard-imports")
 
-package processor
+package io.github.samhoby.kotlintojs.processor
 
-import annotations.JsExportClass
-import annotations.JsExportFunction
 import com.google.devtools.ksp.getDeclaredFunctions
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.KSPLogger
@@ -12,15 +10,26 @@ import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.symbol.*
 import com.google.devtools.ksp.validate
 import com.squareup.kotlinpoet.*
+import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
-import processor.handlers.*
-import types.TypeMapping
+import io.github.samhoby.kotlintojs.annotations.JsExportClass
+import io.github.samhoby.kotlintojs.annotations.JsExportConverter
+import io.github.samhoby.kotlintojs.annotations.JsExportFunction
+import io.github.samhoby.kotlintojs.annotations.JsExportReplacement
+import io.github.samhoby.kotlintojs.processor.handlers.CollectionHandler
+import io.github.samhoby.kotlintojs.processor.handlers.LongHandler
+import io.github.samhoby.kotlintojs.processor.handlers.ManglingHandler
+import io.github.samhoby.kotlintojs.processor.handlers.MapHandler
+import io.github.samhoby.kotlintojs.processor.handlers.SuspendHandler
+import io.github.samhoby.kotlintojs.processor.handlers.ValueClassHandler
+import io.github.samhoby.kotlintojs.processor.types.Replacement
+import io.github.samhoby.kotlintojs.processor.types.TypeMapping
 
 /**
  * KSP processor that generates `@JsExport` wrapper objects for classes and functions annotated
- * with [annotations.JsExportClass] or [annotations.JsExportFunction].
+ * with [JsExportClass] or [JsExportFunction].
  *
  * This class is responsible only for orchestration: collecting annotated symbols, delegating
  * type resolution and conflict detection to the appropriate handlers, and writing the generated
@@ -38,20 +47,27 @@ class WrapperProcessor(
 
     private val pendingImports = mutableSetOf<ClassName>()
 
-    // Map conversion function names (from kotlintojs.generated) referenced by the file being built.
-    // Cleared at the start of each generateWrapper / generateUtils call.
     private val pendingConversionImports = mutableSetOf<String>()
 
     /**
-     * Main KSP processing entry point. Collects all symbols annotated with [annotations.JsExportClass]
-     * and [annotations.JsExportFunction], groups member functions under their declaring class,
+     * Registry of `@JsExportReplacement` declarations, keyed by the fully-qualified name of the
+     * Kotlin type being replaced (e.g. `pt.unravel.types.Either`). Populated at the start of each
+     * round and consulted by [resolveMapping].
+     */
+    private val replacements = mutableMapOf<String, Replacement>()
+
+    /**
+     * Main KSP processing entry point. Collects all symbols annotated with [JsExportClass]
+     * and [JsExportFunction], groups member functions under their declaring class,
      * checks for name-mangling conflicts, and generates the corresponding wrapper files.
      *
-     * Standalone [annotations.JsExportFunction]s (not inside a class) are gathered into a single
+     * Standalone [JsExportFunction]s (not inside a class) are gathered into a single
      * `JsExportUtils` object. Map types encountered during wrapper generation produce a shared
      * `TypeConversion.kt` file at the end of the round.
      */
     override fun process(resolver: Resolver): List<KSAnnotated> {
+        collectReplacements(resolver)
+
         val classes =
             resolver
                 .getSymbolsWithAnnotation(JsExportClass::class.qualifiedName!!)
@@ -105,6 +121,44 @@ class WrapperProcessor(
     }
 
     /**
+     * Scans for `@JsExportReplacement` declarations and fills [replacements], mapping each replaced
+     * type's fully-qualified name to the JS-facing type and its converter function. Re-run each
+     * round so the registry reflects the symbols currently visible.
+     */
+    private fun collectReplacements(resolver: Resolver) {
+        replacements.clear()
+        resolver
+            .getSymbolsWithAnnotation(JsExportReplacement::class.qualifiedName!!)
+            .filterIsInstance<KSClassDeclaration>()
+            .forEach { decl ->
+                val annotation =
+                    decl.annotations.first { it.shortName.asString() == JsExportReplacement::class.simpleName }
+                val replacedType = annotation.arguments.first { it.name?.asString() == "replaces" }.value as KSType
+                val replacedName = replacedType.declaration.qualifiedName?.asString() ?: return@forEach
+
+                val converter =
+                    decl.declarations
+                        .filterIsInstance<KSClassDeclaration>()
+                        .firstOrNull { it.isCompanionObject }
+                        ?.getDeclaredFunctions()
+                        ?.firstOrNull { function ->
+                            function.annotations.any { it.shortName.asString() == JsExportConverter::class.simpleName }
+                        }
+                if (converter == null) {
+                    logger.error(
+                        "@JsExportReplacement type '${decl.simpleName.asString()}' must declare a companion " +
+                            "function annotated @JsExportConverter that converts '$replacedName' to it.",
+                        decl,
+                    )
+                    return@forEach
+                }
+
+                replacements[replacedName] =
+                    Replacement(type = decl.toClassName(), converter = converter.simpleName.asString())
+            }
+    }
+
+    /**
      * Generates a `{ClassName}Js` wrapper object for [serviceClass], exposing [functions] with
      * JS-compatible types. Suspend functions are wrapped in `Promise`. Type conversions are
      * delegated to the relevant handlers.
@@ -127,10 +181,12 @@ class WrapperProcessor(
         val classBuilder = jsExportObjectBuilder(wrapperName)
 
         if (!isValueClass) {
+            val initializer =
+                if (isObject) CodeBlock.of("%T", serviceClass.toClassName()) else buildServiceInitializer(serviceClass)
             classBuilder.addProperty(
                 PropertySpec
                     .builder("service", serviceClass.toClassName(), KModifier.PRIVATE)
-                    .initializer(if (isObject) "%T" else "%T()", serviceClass.toClassName())
+                    .initializer(initializer)
                     .build(),
             )
         }
@@ -143,7 +199,7 @@ class WrapperProcessor(
             } else {
                 null
             }
-        // The value class's own underlying value is emitted through toKotlin in each call.
+
         valueClassSelf?.let { (_, mapping) -> pendingConversionImports.addAll(mapping.importsForToKotlin) }
 
         addScopeIfNeeded(classBuilder, functions)
@@ -177,8 +233,39 @@ class WrapperProcessor(
     }
 
     /**
+     * Builds the initialiser for the wrapped `service` instance of a regular (non-object,
+     * non-value) class.
+     *
+     * The generated wrapper is a parameterless `@JsExport object`, so it cannot receive the
+     * service's dependencies from the JS side. Instead, it constructs the service eagerly,
+     * instantiating every required primary-constructor parameter with that parameter type's own
+     * no-argument constructor — e.g. `AuthAPI(httpClient = SharedHttpClient())`. Parameters that
+     * declare a default value are omitted so their default applies. Each dependency type is
+     * referenced via `%T`, so KotlinPoet imports it automatically.
+     *
+     * This assumes every required dependency is itself constructible with no arguments (directly or
+     * through its own defaults); dependencies that need their own mandatory arguments are not
+     * supported.
+     */
+    private fun buildServiceInitializer(serviceClass: KSClassDeclaration): CodeBlock {
+        val requiredParams =
+            serviceClass.primaryConstructor
+                ?.parameters
+                .orEmpty()
+                .filterNot { param -> param.hasDefault }
+
+        val initializer = CodeBlock.builder().add("%T(", serviceClass.toClassName())
+        requiredParams.forEachIndexed { index, param ->
+            if (index > 0) initializer.add(", ")
+            val dependency = param.type.resolve().declaration as KSClassDeclaration
+            initializer.add("%N = %T()", param.name!!.asString(), dependency.toClassName())
+        }
+        return initializer.add(")").build()
+    }
+
+    /**
      * Generates `JsExportUtils.kt` collecting all standalone [functions] annotated with
-     * [annotations.JsExportFunction] into a single `JsExportUtils` object.
+     * [JsExportFunction] into a single `JsExportUtils` object.
      * Only called when at least one such function exists.
      */
     private fun generateUtils(functions: List<KSFunctionDeclaration>) {
@@ -321,6 +408,42 @@ class WrapperProcessor(
      */
     private fun resolveMapping(type: KSType): TypeMapping =
         when {
+            replacements.containsKey(type.declaration.qualifiedName?.asString()) -> {
+                val replacement = replacements.getValue(type.declaration.qualifiedName!!.asString())
+                val argumentMappings = type.arguments.map { argument -> resolveMapping(argument.type!!.resolve()) }
+
+                // The @JsExportConverter is generic and passes its payload through unchanged, so it
+                // cannot transform a nested value (List -> Array, Long -> Double, a value class, ...).
+                // A replacement is only sound when every type argument is already exportable as-is.
+                // Fail loudly rather than emit a boundary whose declared type does not match the
+                // value it carries. BigInt-mode Long stays a passthrough, so it is allowed.
+                val probe = "__v__"
+                val needsInnerConversion =
+                    argumentMappings.any { mapping -> mapping.toJs(probe) != probe || mapping.toKotlin(probe) != probe }
+                if (needsInnerConversion) {
+                    logger.error(
+                        "@JsExportReplacement type '${replacement.type.simpleName}' is used with a type " +
+                            "argument that needs its own conversion at the JS boundary (such as List, Set, " +
+                            "Map, Long without BigInt mode, or a value class). The generic converter cannot " +
+                            "transform nested values, so a replacement must wrap an already-exportable type. " +
+                            "Return the inner type directly instead of nesting it inside " +
+                            "'${type.declaration.simpleName.asString()}'.",
+                    )
+                }
+
+                val jsType =
+                    if (argumentMappings.isEmpty()) {
+                        replacement.type
+                    } else {
+                        replacement.type.parameterizedBy(argumentMappings.map { mapping -> mapping.jsTypeName })
+                    }
+
+                TypeMapping(
+                    jsTypeName = jsType,
+                    toJs = { expression -> "${replacement.type.simpleName}.${replacement.converter}($expression)" },
+                )
+            }
+
             ValueClassHandler.handles(type) -> {
                 pendingImports.add((type.declaration as KSClassDeclaration).toClassName())
                 ValueClassHandler.resolveMapping(type, ::resolveMapping)

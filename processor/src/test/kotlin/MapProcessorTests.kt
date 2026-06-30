@@ -1,7 +1,6 @@
-package processor
-
 import com.tschuchort.compiletesting.SourceFile
 import org.junit.jupiter.api.Test
+import io.github.samhoby.kotlintojs.tests.BaseProcessorTest
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -20,7 +19,7 @@ class MapProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class CollectionService {
@@ -35,7 +34,10 @@ class MapProcessorTests : BaseProcessorTest() {
 
         assertTrue(wrapperCode.contains("payload.toMap1()"))
         assertTrue(conversionsCode.contains("fun Json.toMap1()"))
-        assertTrue(conversionsCode.contains("k.toInt()"), "Int keys must be parsed from the JS string key via k.toInt()")
+        assertTrue(
+            conversionsCode.contains("k.toInt()"),
+            "Int keys must be parsed from the JS string key via k.toInt()",
+        )
     }
 
     @Test
@@ -44,7 +46,7 @@ class MapProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class CollectionService {
@@ -65,7 +67,7 @@ class MapProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class CollectionService {
@@ -86,7 +88,7 @@ class MapProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class CollectionService {
@@ -107,7 +109,7 @@ class MapProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 data class CompositeKey(val a: String, val b: Int)
 
@@ -132,7 +134,7 @@ class MapProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class CollectionService {
@@ -159,7 +161,7 @@ class MapProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class CollectionService {
@@ -184,7 +186,7 @@ class MapProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class CollectionService {
@@ -207,7 +209,7 @@ class MapProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class CollectionService {
@@ -230,7 +232,7 @@ class MapProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class CollectionService {
@@ -249,7 +251,7 @@ class MapProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class CollectionService {
@@ -268,7 +270,7 @@ class MapProcessorTests : BaseProcessorTest() {
             SourceFile.kotlin(
                 "CollectionService.kt",
                 """
-                import annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
 
                 @JsExportClass
                 class CollectionService {
