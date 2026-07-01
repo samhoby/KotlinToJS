@@ -43,7 +43,7 @@ processor generates the conversion layer. Your Kotlin code stays unchanged.
 
 Every example in this document is one slice of the same class: `UserAPI`, a Kotlin Multiplatform
 HTTP client. It lives in `commonMain`, is constructed with a shared `httpClient`, runs every call
-as a `suspend` function, and returns `Either<ProblemDetail, T>` so callers get a typed error
+as a `suspend` function, and returns `Either<E, T>` so callers get a typed error
 instead of an exception. Android and iOS consume it directly; this plugin generates a JS-callable
 wrapper on top without touching the source.
 
@@ -78,7 +78,7 @@ sealed class Either<out E, out T> {
 /** Shared HTTP client injected into every API class. */
 class SharedHttpClient {
     /** Runs [block] and wraps its result, so failures never cross the boundary as exceptions. */
-    suspend fun <T> safeGet(block: suspend () -> T): Either<ProblemDetail, T> {
+    suspend fun <T> safeGet(block: suspend () -> T): Either<E, T> {
         delay(10)
         return Either.Right(block())
     }
@@ -263,18 +263,24 @@ generated wrapper.
 
 > **Type arguments are carried over verbatim.** The converter is generic
 > (`fun <E, T> fromEither(...): JsEither<E, T>`), so it cannot transform the value it wraps. The
-> replacement reuses the original type arguments as-is, so `Either<ProblemDetail, UserOutputModel>`
-> becomes `JsEither<ProblemDetail, UserOutputModel>` without converting them. A replacement must
-> therefore wrap an already-exportable type.
+> replacement reuses the original type arguments exactly as they are, so
+> `Either<ProblemDetail, UserOutputModel>` becomes `JsEither<ProblemDetail, UserOutputModel>`.
 >
-> If a type argument needs its own conversion at the boundary, the build fails with a clear error
-> rather than producing a broken wrapper. This covers `List`, `Set`, `Map`, value classes, and
-> `Long` without BigInt mode. For example `Either<ProblemDetail, Long>` without `-Xes-long-as-bigint`
-> is rejected: the converter would hand JavaScript an opaque `Long` it cannot read. In BigInt mode
-> `Long` passes through natively, so `Either<ProblemDetail, Long>` is allowed.
+> **Limitation such as collections nested in a replacement are not converted.** Because the arguments are
+> passed through untouched, a collection inside a replacement is exposed in its *raw* Kotlin form
+> rather than the JS-friendly form it would get at a top-level boundary: `List`/`Set` reach
+> TypeScript as `KtList`/`KtSet` (not `Array`), and `Map` as `KtMap` (not `Json`). For example
+> `Either<ProblemDetail, List<UserOutputModel>>` becomes1
+> `JsEither<ProblemDetail, List<UserOutputModel>>`, which TypeScript sees as
+> `KtList<UserOutputModel>`. That is functional but less idiomatic than an array, the generic
+> converter has no way to reach inside and transform the payload. If you want the `Array`/`Json`
+> conversion, return the collection directly (as `getUserNames`/`getExpertiseFlags` do) instead of
+> nesting it in the replacement, see [Collections](#collections).
 >
-> Return collections and maps directly (as `getUserNames` and `getExpertiseFlags` do) so the
-> collection handler converts them, rather than nesting them inside a replacement.
+> A type argument that is not exportable in its raw form at all, such as `Long` without
+> `-Xes-long-as-bigint`, or a value class,  is reported by the Kotlin/JS compiler when it compiles
+> the generated wrapper. In BigInt mode `Long` is exportable natively, so
+> `Either<ProblemDetail, Long>` works.
 
 **Living in `commonMain`.** Both `@JsExportClass` and `@JsExportReplacement` have `SOURCE`
 retention, so they are erased after compilation and cost nothing at runtime on any target. The KSP
@@ -349,8 +355,8 @@ kotlin {
 
 The plugin ships as **two artefacts**:
 
-| Artifact                    | What it is                                                                                 | Where it goes                         |
-|-----------------------------|--------------------------------------------------------------------------------------------|---------------------------------------|
+| Artifact                        | What it is                                                                                 | Where it goes                         |
+|---------------------------------|--------------------------------------------------------------------------------------------|---------------------------------------|
 | `io.github.samhoby:annotations` | The `@JsExportClass` / `@JsExportFunction` annotations, multiplatform for jvm, js, and ios | `commonMain` or `jsMain` dependencies |
 | `io.github.samhoby:processor`   | The KSP processor that generates the wrappers, JVM only                                    | `add("kspJs", ...)`                   |
 
@@ -472,9 +478,13 @@ fun getExpertiseFlags(): Promise<Json> =
 A nested `List<List<UserOutputModel>>` would convert recursively to `Array<Array<UserOutputModel>>`
 via `.map { it.toTypedArray() }.toTypedArray()`. For `Map` types, the decode/encode pair (here
 `toMap1` / `toJson1`) is written to `TypeConversion.kt` in package `kotlintojs.generated`, and the
-wrapper imports the ones it uses. Collections are returned directly rather than wrapped in `Either`,
-because a replacement type carries its arguments over unconverted (see
-[Custom type replacement](#custom-type-replacement)).
+wrapper imports the ones it uses.
+
+These conversions apply to a collection at a **top-level** boundary (a return type or parameter). A
+collection nested inside a [replacement](#custom-type-replacement), e.g. `Either<ProblemDetail, List<UserOutputModel>>`, 
+is **not** converted: it is carried over raw and reaches TypeScript as `KtList` / `KtMap` rather 
+than `Array` / `Json`, because the replacement's generic converter cannot transform nested values. 
+Return collections directly, as `getUserNames` and `getExpertiseFlags` do, to get the `Array` / `Json` form.
 
 A JS `Json` object only has string keys, so map keys are decoded back to the declared Kotlin type.
 Supported key types are `String`, `Int`, `Long`, `Short`, `Byte`, `Float`, `Double`, and `Boolean`.
@@ -716,7 +726,7 @@ JS receives `"ADMIN"`. To go the other way, accept the string and resolve it wit
 
 ### Sealed classes
 
-`Either<ProblemDetail, T>` returned by every `UserAPI` method, is itself a sealed class.
+`Either<E, T>` returned by every `UserAPI` method, is itself a sealed class.
 Exporting it directly with `@JsExport` produces unusable JS:
 
 ```kotlin
@@ -725,7 +735,6 @@ sealed class Either<out E, out T> {
     data class Left<E>(val value: E) : Either<E, Nothing>()
     data class Right<T>(val value: T) : Either<Nothing, T>()
 }
-// JS consumers must navigate Kotlin-generated class names like Either.Left
 ```
 
 **Using `@JsExportReplacement` (recommended):**

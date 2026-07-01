@@ -7,7 +7,7 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrTarget
 
 private const val GROUP = "io.github.samhoby"
-private const val VERSION = "0.1.0"
+private const val VERSION = "0.1.1"
 
 /**
  * Gradle plugin that applies KSP and wires up the KotlinToJS annotation processor.

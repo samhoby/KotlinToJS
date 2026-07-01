@@ -80,22 +80,26 @@ class ReplacementProcessorTests : BaseProcessorTest() {
     }
 
     @Test
-    fun `should fail when a replacement wraps a type that needs conversion`() {
+    fun `should carry a collection type argument raw inside a replacement`() {
         val source =
             SourceFile.kotlin(
-                "CountService.kt",
+                "ListService.kt",
                 """
                 $replacementDeclarations
 
                 @JsExportClass
-                class CountService {
-                    fun getCount(): Either<String, Long> = Either.Right(1L)
+                class ListService {
+                    fun getItems(): Either<String, List<Int>> = Either.Right(listOf(1))
                 }
                 """.trimIndent(),
             )
 
-        val messages = compileWithMessages(source)
+        val files = compile(source)
+        val wrapper = files.single { file -> file.name == "ListServiceJs.kt" }.readText()
 
-        assertTrue(messages.any { message -> message.contains("needs its own conversion at the JS boundary") })
+        // The passthrough converter returns the payload unchanged, so the boundary keeps the raw
+        // `List<Int>` (exposed to TypeScript as `KtList<Int>`) rather than converting it to `Array`.
+        assertTrue(wrapper.contains("JsEither<String, List<Int>>"))
+        assertTrue(wrapper.contains("JsEither.fromEither(service.getItems())"))
     }
 }

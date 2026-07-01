@@ -410,32 +410,13 @@ class WrapperProcessor(
         when {
             replacements.containsKey(type.declaration.qualifiedName?.asString()) -> {
                 val replacement = replacements.getValue(type.declaration.qualifiedName!!.asString())
-                val argumentMappings = type.arguments.map { argument -> resolveMapping(argument.type!!.resolve()) }
 
-                // The @JsExportConverter is generic and passes its payload through unchanged, so it
-                // cannot transform a nested value (List -> Array, Long -> Double, a value class, ...).
-                // A replacement is only sound when every type argument is already exportable as-is.
-                // Fail loudly rather than emit a boundary whose declared type does not match the
-                // value it carries. BigInt-mode Long stays a passthrough, so it is allowed.
-                val probe = "__v__"
-                val needsInnerConversion =
-                    argumentMappings.any { mapping -> mapping.toJs(probe) != probe || mapping.toKotlin(probe) != probe }
-                if (needsInnerConversion) {
-                    logger.error(
-                        "@JsExportReplacement type '${replacement.type.simpleName}' is used with a type " +
-                            "argument that needs its own conversion at the JS boundary (such as List, Set, " +
-                            "Map, Long without BigInt mode, or a value class). The generic converter cannot " +
-                            "transform nested values, so a replacement must wrap an already-exportable type. " +
-                            "Return the inner type directly instead of nesting it inside " +
-                            "'${type.declaration.simpleName.asString()}'.",
-                    )
-                }
-
+                val typeArguments = type.arguments.map { argument -> argument.type!!.resolve().toTypeName() }
                 val jsType =
-                    if (argumentMappings.isEmpty()) {
+                    if (typeArguments.isEmpty()) {
                         replacement.type
                     } else {
-                        replacement.type.parameterizedBy(argumentMappings.map { mapping -> mapping.jsTypeName })
+                        replacement.type.parameterizedBy(typeArguments)
                     }
 
                 TypeMapping(
