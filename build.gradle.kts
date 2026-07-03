@@ -20,6 +20,13 @@ dependencies {
     kover(project(":processor"))
 }
 
+val sonarTask = tasks.getByName("sonar")
+subprojects {
+    afterEvaluate {
+        tasks.filter { task -> task.name == "lint" }.forEach { lintTask -> sonarTask.dependsOn(lintTask) }
+    }
+}
+
 allprojects {
     dependencyLocking {
         lockAllConfigurations()
