@@ -1,4 +1,4 @@
-package io.github.samhoby.kotlintojs.processor
+package io.github.samhoby.kotlintojs.processor.types
 
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType

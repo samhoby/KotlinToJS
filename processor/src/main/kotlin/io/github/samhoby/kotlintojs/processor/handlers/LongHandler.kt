@@ -3,8 +3,8 @@ package io.github.samhoby.kotlintojs.processor.handlers
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.KSType
 import com.squareup.kotlinpoet.asClassName
-import io.github.samhoby.kotlintojs.processor.isLong
 import io.github.samhoby.kotlintojs.processor.types.TypeMapping
+import io.github.samhoby.kotlintojs.processor.types.isLong
 
 /**
  * Handles `Long` at `@JsExport` boundaries.

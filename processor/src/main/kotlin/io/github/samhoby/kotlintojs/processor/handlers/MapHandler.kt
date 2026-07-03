@@ -7,16 +7,16 @@ import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.ksp.toTypeName
 import com.squareup.kotlinpoet.ksp.writeTo
-import io.github.samhoby.kotlintojs.processor.elementType
-import io.github.samhoby.kotlintojs.processor.isList
-import io.github.samhoby.kotlintojs.processor.isLong
-import io.github.samhoby.kotlintojs.processor.isMap
-import io.github.samhoby.kotlintojs.processor.isSet
-import io.github.samhoby.kotlintojs.processor.isString
-import io.github.samhoby.kotlintojs.processor.keyType
 import io.github.samhoby.kotlintojs.processor.types.JsRuntimeNames
 import io.github.samhoby.kotlintojs.processor.types.TypeMapping
-import io.github.samhoby.kotlintojs.processor.valueType
+import io.github.samhoby.kotlintojs.processor.types.elementType
+import io.github.samhoby.kotlintojs.processor.types.isList
+import io.github.samhoby.kotlintojs.processor.types.isLong
+import io.github.samhoby.kotlintojs.processor.types.isMap
+import io.github.samhoby.kotlintojs.processor.types.isSet
+import io.github.samhoby.kotlintojs.processor.types.isString
+import io.github.samhoby.kotlintojs.processor.types.keyType
+import io.github.samhoby.kotlintojs.processor.types.valueType
 
 /**
  * Handles `Map<K, V>` ⇄ `Json` boundary conversion.

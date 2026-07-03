@@ -5,12 +5,12 @@ import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
-import io.github.samhoby.kotlintojs.processor.isList
-import io.github.samhoby.kotlintojs.processor.isLong
-import io.github.samhoby.kotlintojs.processor.isMap
-import io.github.samhoby.kotlintojs.processor.isSet
 import io.github.samhoby.kotlintojs.processor.types.JsRuntimeNames
 import io.github.samhoby.kotlintojs.processor.types.TypeMapping
+import io.github.samhoby.kotlintojs.processor.types.isList
+import io.github.samhoby.kotlintojs.processor.types.isLong
+import io.github.samhoby.kotlintojs.processor.types.isMap
+import io.github.samhoby.kotlintojs.processor.types.isSet
 
 /**
  * Handles `List<T>` and `Set<T>` → `Array<T>` boundary conversion.

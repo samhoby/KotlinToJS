@@ -2,8 +2,8 @@ package io.github.samhoby.kotlintojs.processor.handlers
 
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
-import io.github.samhoby.kotlintojs.processor.isValueClass
 import io.github.samhoby.kotlintojs.processor.types.TypeMapping
+import io.github.samhoby.kotlintojs.processor.types.isValueClass
 
 /**
  * Handles Kotlin value (inline) classes at `@JsExport` boundaries.

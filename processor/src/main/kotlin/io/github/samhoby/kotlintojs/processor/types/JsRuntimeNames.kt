@@ -9,13 +9,17 @@ import com.squareup.kotlinpoet.MemberName
  * here, and referencing them via `%T`/`%M` at every call site, lets KotlinPoet resolve imports
  * from the generated code structure itself instead of via manual `addImport(String, String)` calls.
  */
+private const val KOTLIN_JS_PACKAGE = "kotlin.js"
+private const val KOTLINX_COROUTINES_PACKAGE = "kotlinx.coroutines"
+private const val KOTLIN_PACKAGE = "kotlin"
+
 internal object JsRuntimeNames {
-    val json = ClassName("kotlin.js", "Json")
-    val promiseClass = ClassName("kotlin.js", "Promise")
-    val jsExport = ClassName("kotlin.js", "JsExport")
-    val experimentalJsExport = ClassName("kotlin.js", "ExperimentalJsExport")
-    val optIn = ClassName("kotlin", "OptIn")
-    val coroutineScope = ClassName("kotlinx.coroutines", "CoroutineScope")
-    val mainScope = ClassName("kotlinx.coroutines", "MainScope")
-    val promise = MemberName("kotlinx.coroutines", "promise")
+    val json = ClassName(KOTLIN_JS_PACKAGE, "Json")
+    val promiseClass = ClassName(KOTLIN_JS_PACKAGE, "Promise")
+    val jsExport = ClassName(KOTLIN_JS_PACKAGE, "JsExport")
+    val experimentalJsExport = ClassName(KOTLIN_JS_PACKAGE, "ExperimentalJsExport")
+    val optIn = ClassName(KOTLIN_PACKAGE, "OptIn")
+    val coroutineScope = ClassName(KOTLINX_COROUTINES_PACKAGE, "CoroutineScope")
+    val mainScope = ClassName(KOTLINX_COROUTINES_PACKAGE, "MainScope")
+    val promise = MemberName(KOTLINX_COROUTINES_PACKAGE, "promise")
 }
