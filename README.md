@@ -1,5 +1,12 @@
 # KotlinToJS
 
+---
+
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=samhoby_KotlinToJS&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=samhoby_KotlinToJS)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=samhoby_KotlinToJS&metric=coverage)](https://sonarcloud.io/summary/new_code?id=samhoby_KotlinToJS)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=samhoby_KotlinToJS&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=samhoby_KotlinToJS)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=samhoby_KotlinToJS&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=samhoby_KotlinToJS)
+
 A KSP processor for Kotlin Multiplatform projects with a JavaScript target.
 
 `@JsExport` silently rejects or mangles several common Kotlin types. **Suspend functions**,
@@ -14,26 +21,26 @@ processor generates the conversion layer. Your Kotlin code stays unchanged.
 ## Table Of Contents
 
 - [Usage](#usage)
-  - [The example we build on](#the-example-we-build-on)
-  - [What the processor generates](#what-the-processor-generates)
-  - [Consuming it from JavaScript](#consuming-it-from-javascript)
-  - [Custom type replacement](#custom-type-replacement)
-  - [@JsExportClass vs @JsExport](#jsexportclass-vs-jsexport)
+    - [The example we build on](#the-example-we-build-on)
+    - [What the processor generates](#what-the-processor-generates)
+    - [Consuming it from JavaScript](#consuming-it-from-javascript)
+    - [Custom type replacement](#custom-type-replacement)
+    - [@JsExportClass vs @JsExport](#jsexportclass-vs-jsexport)
 - [Getting Started](#getting-started)
-  - [Installation](#installation)
-  - [Where does generated code go?](#where-does-generated-code-go)
-  - [Full example setup](#full-example-setup)
+    - [Installation](#installation)
+    - [Where does generated code go?](#where-does-generated-code-go)
+    - [Full example setup](#full-example-setup)
 - [Limitations](#limitations)
-  - [Collections](#collections)
-  - [Long](#long)
-  - [Value classes](#value-classes)
-  - [Interface](#interface)
-    - [Solution-Using Implementation class](#solution-using-implementation-class)
-    - [Solution-Using Expect-Actual](#solution-using-expect-actual)
-  - [Enum](#enum)
-  - [Sealed classes](#sealed-classes)
-  - [Code mangling](#code-mangling)
-  - [Suspended functions](#suspended-functions)
+    - [Collections](#collections)
+    - [Long](#long)
+    - [Value classes](#value-classes)
+    - [Interface](#interface)
+        - [Solution-Using Implementation class](#solution-using-implementation-class)
+        - [Solution-Using Expect-Actual](#solution-using-expect-actual)
+    - [Enum](#enum)
+    - [Sealed classes](#sealed-classes)
+    - [Code mangling](#code-mangling)
+    - [Suspended functions](#suspended-functions)
 
 ---
 
@@ -159,7 +166,7 @@ object UserAPIJs {
 
 > **How the service is constructed.** The generated wrapper is a parameterless `@JsExport object`,
 > so it cannot receive `UserAPI`'s dependencies from JS. Instead, it builds the service eagerly,
-> instantiating each required constructor parameter with that type's own no-argument constructor, 
+> instantiating each required constructor parameter with that type's own no-argument constructor,
 > here `UserAPI(httpClient = SharedHttpClient())`. Parameters that declare a default value are
 > omitted so their default applies. This requires every mandatory dependency to be constructible
 > with no arguments (directly or through its own defaults).
@@ -213,7 +220,7 @@ if (res.success) {
 
 const names = await UserAPIJs.getUserNames()       // string[]
 const flags = await UserAPIJs.getExpertiseFlags()  // { "1": true, "2": false }
-const ver   = JsExportUtils.apiVersion()           // "1.0.0"
+const ver = JsExportUtils.apiVersion()           // "1.0.0"
 ```
 
 Full behaviour of each conversion is documented in [Limitations](#limitations).
@@ -276,7 +283,7 @@ generated wrapper.
 > nesting it in the replacement, see [Collections](#collections).
 >
 > A type argument that is not exportable in its raw form at all, such as `Long` without
-> `-Xes-long-as-bigint`, or a value class,  is reported by the Kotlin/JS compiler when it compiles
+> `-Xes-long-as-bigint`, or a value class, is reported by the Kotlin/JS compiler when it compiles
 > the generated wrapper. In BigInt mode `Long` is exportable natively, so
 > `Either<ProblemDetail, Long>` works.
 
@@ -354,11 +361,13 @@ The plugin ships as **two artefacts**:
 | `io.github.samhoby:annotations` | The `@JsExportClass` / `@JsExportFunction` annotations, multiplatform for jvm, js, and ios | `commonMain` or `jsMain` dependencies |
 | `io.github.samhoby:processor`   | The KSP processor that generates the wrappers, JVM only                                    | `add("kspJs", ...)`                   |
 
-The `@JsExportClass` and `@JsExportFunction` annotations can be placed in `commonMain` or `jsMain`. The processor runs for the JS compilation regardless of where the annotations are placed.
+The `@JsExportClass` and `@JsExportFunction` annotations can be placed in `commonMain` or `jsMain`. The processor runs
+for the JS compilation regardless of where the annotations are placed.
 
 ### Where does generated code go?
 
-KSP writes the generated `.kt` files to `build/generated/ksp/` and **adds that directory to the JS compilation source set**. You do not need to configure any `srcDir`.
+KSP writes the generated `.kt` files to `build/generated/ksp/` and **adds that directory to the JS compilation source
+set**. You do not need to configure any `srcDir`.
 
 After `./gradlew build`, find the generated wrappers at:
 
@@ -366,7 +375,8 @@ After `./gradlew build`, find the generated wrappers at:
 build/generated/ksp/js/jsMain/kotlin/
 ```
 
-IntelliJ IDEA and Android Studio index this directory, so **Go to Declaration** and **Find Usages** navigate into generated files.
+IntelliJ IDEA and Android Studio index this directory, so **Go to Declaration** and **Find Usages** navigate into
+generated files.
 
 > If the IDE does not pick up the directory, add it to `jsMain`:
 > ```kotlin
@@ -384,18 +394,18 @@ IntelliJ IDEA and Android Studio index this directory, so **Go to Declaration** 
 ```kotlin
 // build.gradle.kts
 plugins {
-  kotlin("multiplatform") version "2.1.0"
-  id("io.github.samhoby.kotlintojs") version "0.1.0"
+    kotlin("multiplatform") version "2.1.0"
+    id("io.github.samhoby.kotlintojs") version "0.1.0"
 }
 
 kotlin {
-  js(IR) {
-    browser() // or nodejs
-    binaries.executable()
+    js(IR) {
+        browser() // or nodejs
+        binaries.executable()
 
-    // Optional: Required only if you expose `Long` and want native JS BigInt
-    compilerOptions { freeCompilerArgs.add("-Xes-long-as-bigint") }
-  }
+        // Optional: Required only if you expose `Long` and want native JS BigInt
+        compilerOptions { freeCompilerArgs.add("-Xes-long-as-bigint") }
+    }
 }
 ```
 
@@ -403,7 +413,9 @@ kotlin {
 
 ## Limitations
 
-The following sections describe Kotlin/JS limitations when using `@JsExport` directly, and how this plugin handles each one. Each draws on the `UserAPI` from [Usage](#the-example-we-build-on). For more detail, see this [link](https://dev.to/touchlab/jsexport-guide-for-exposing-kotlin-to-js-20l9).
+The following sections describe Kotlin/JS limitations when using `@JsExport` directly, and how this plugin handles each
+one. Each draws on the `UserAPI` from [Usage](#the-example-we-build-on). For more detail, see
+this [link](https://dev.to/touchlab/jsexport-guide-for-exposing-kotlin-to-js-20l9).
 
 ### Collections
 
@@ -420,13 +432,13 @@ fun getUserNames(): List<String> = listOf("Alice", "Bob")
 
 **What this plugin generates:**
 
-| Kotlin type     | JS boundary type  | Conversion                                                                       |
-|-----------------|-------------------|----------------------------------------------------------------------------------|
-| `List<T>`       | `Array<T>`        | `.toTypedArray()` / `.toList()`                                                  |
-| `Set<T>`        | `Array<T>`        | `.toTypedArray()` / `.toSet()`                                                   |
-| `Map<K, V>`     | `Json`            | numeric ID decode/encode functions in TypeConversion.kt (e.g., toMap1, toJson1)  |
-| `List<List<T>>` | `Array<Array<T>>` | nested conversion                                                                |
-| `Set<Long>`     | `Array<Long>`     | combined BigInt and Set conversion, needs BigInt mode                            |
+| Kotlin type     | JS boundary type  | Conversion                                                                      |
+|-----------------|-------------------|---------------------------------------------------------------------------------|
+| `List<T>`       | `Array<T>`        | `.toTypedArray()` / `.toList()`                                                 |
+| `Set<T>`        | `Array<T>`        | `.toTypedArray()` / `.toSet()`                                                  |
+| `Map<K, V>`     | `Json`            | numeric ID decode/encode functions in TypeConversion.kt (e.g., toMap1, toJson1) |
+| `List<List<T>>` | `Array<Array<T>>` | nested conversion                                                               |
+| `Set<Long>`     | `Array<Long>`     | combined BigInt and Set conversion, needs BigInt mode                           |
 
 Each `UserAPI` collection return is converted at the boundary:
 
@@ -444,9 +456,9 @@ via `.map { it.toTypedArray() }.toTypedArray()`. For `Map` types, the decode/enc
 wrapper imports the ones it uses.
 
 These conversions apply to a collection at a **top-level** boundary (a return type or parameter). A
-collection nested inside a [replacement](#custom-type-replacement), e.g. `Either<ProblemDetail, List<UserOutputModel>>`, 
-is **not** converted: it is carried over raw and reaches TypeScript as `KtList` / `KtMap` rather 
-than `Array` / `Json`, because the replacement's generic converter cannot transform nested values. 
+collection nested inside a [replacement](#custom-type-replacement), e.g. `Either<ProblemDetail, List<UserOutputModel>>`,
+is **not** converted: it is carried over raw and reaches TypeScript as `KtList` / `KtMap` rather
+than `Array` / `Json`, because the replacement's generic converter cannot transform nested values.
 Return collections directly, as `getUserNames` and `getExpertiseFlags` do, to get the `Array` / `Json` form.
 
 A JS `Json` object only has string keys, so map keys are decoded back to the declared Kotlin type.
@@ -473,7 +485,8 @@ suspend fun getUserCount(): Long {
 
 **What this plugin does:**
 
-When `Long` appears at a direct `@JsExport` boundary, the plugin emits a **build warning** and falls back to a `Double` conversion, valid for integers up to 2^53:
+When `Long` appears at a direct `@JsExport` boundary, the plugin emits a **build warning** and falls back to a `Double`
+conversion, valid for integers up to 2^53:
 
 ```
 warning: Long is not supported at @JsExport boundaries without precision loss.
@@ -486,7 +499,8 @@ freeCompilerArgs and set ksp { arg("longAsBigInt", "true") } in your build file.
 fun getUserCount(): Promise<Double> = scope.promise { service.getUserCount().toDouble() }
 ```
 
-The build still succeeds. If your values fit in 53 bits, the `Double` fallback works. For 64-bit precision, enable BigInt mode below.
+The build still succeeds. If your values fit in 53 bits, the `Double` fallback works. For 64-bit precision, enable
+BigInt mode below.
 
 **Enable BigInt support:**
 
@@ -773,7 +787,8 @@ class UserAPI {
 **What this plugin does:**
 
 - If a function has `@JsName("name")`, that name is used as the exported JS name.
-- If multiple overloads exist without `@JsName`, the plugin emits a **compile error** instead of generating mangled wrappers.
+- If multiple overloads exist without `@JsName`, the plugin emits a **compile error** instead of generating mangled
+  wrappers.
 
 ```kotlin
 @JsExportClass
@@ -843,6 +858,6 @@ object UserAPIJs {
 From JavaScript:
 
 ```js
-const user  = await UserAPIJs.getUserById(1n)  // JsEither<ProblemDetail, UserOutputModel>
+const user = await UserAPIJs.getUserById(1n)  // JsEither<ProblemDetail, UserOutputModel>
 const names = await UserAPIJs.getUserNames()   // string[]
 ```
