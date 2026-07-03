@@ -254,4 +254,60 @@ class CollectionProcessorTests : BaseProcessorTest() {
         assertTrue(wrapperCode.contains("Array<Array<String>>"))
         assertTrue(wrapperCode.contains("toTypedArray()"))
     }
+
+    @Test
+    fun `should map a List of Maps to an Array of Json`() {
+        val source =
+            SourceFile.kotlin(
+                "CollectionService.kt",
+                """
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
+
+                @JsExportClass
+                class CollectionService {
+                    fun getRows(): List<Map<String, Int>> = listOf(mapOf("a" to 1))
+                }
+                """.trimIndent(),
+            )
+
+        val files = compile(source)
+        val wrapperCode = files.single { file -> file.name == "CollectionServiceJs.kt" }.readText()
+
+        assertTrue(
+            wrapperCode.contains("Array<Json>"),
+            "A Map nested as a list element resolves its element type to Json at the boundary",
+        )
+    }
+
+    @Test
+    fun `should convert List of Longs with toLong and toDouble in default mode`() {
+        val source =
+            SourceFile.kotlin(
+                "CollectionService.kt",
+                """
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
+
+                @JsExportClass
+                class CollectionService {
+                    fun roundTrip(ids: List<Long>): List<Long> = ids
+                }
+                """.trimIndent(),
+            )
+
+        val files = compile(source)
+        val wrapperCode = files.single { file -> file.name == "CollectionServiceJs.kt" }.readText()
+
+        assertTrue(
+            wrapperCode.contains("ids: Array<Double>"),
+            "In default mode Long elements are exposed as Double at the boundary",
+        )
+        assertTrue(
+            wrapperCode.contains("elem.toLong()"),
+            "The Array<Double> parameter must convert each element back to Long",
+        )
+        assertTrue(
+            wrapperCode.contains("elem.toDouble()"),
+            "The List<Long> return must convert each element to Double for the boundary",
+        )
+    }
 }

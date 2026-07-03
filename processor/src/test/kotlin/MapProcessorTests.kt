@@ -282,4 +282,145 @@ class MapProcessorTests : BaseProcessorTest() {
         val conversionsCode = compile(source).single { file -> file.name == "TypeConversion.kt" }.readText()
         assertTrue(conversionsCode.contains("k.toFloat()"), "Float keys must be parsed via k.toFloat()")
     }
+
+    @Test
+    fun `should cast Double map values with unsafeCast`() {
+        val source =
+            SourceFile.kotlin(
+                "CollectionService.kt",
+                """
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
+
+                @JsExportClass
+                class CollectionService {
+                    fun process(payload: Map<String, Double>): Map<String, Double> = payload
+                }
+                """.trimIndent(),
+            )
+
+        val conversionsCode = compile(source).single { file -> file.name == "TypeConversion.kt" }.readText()
+        assertTrue(conversionsCode.contains("unsafeCast<Double>"), "Double values must be cast via unsafeCast<Double>")
+    }
+
+    @Test
+    fun `should cast Float map values with unsafeCast`() {
+        val source =
+            SourceFile.kotlin(
+                "CollectionService.kt",
+                """
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
+
+                @JsExportClass
+                class CollectionService {
+                    fun process(payload: Map<String, Float>): Map<String, Float> = payload
+                }
+                """.trimIndent(),
+            )
+
+        val conversionsCode = compile(source).single { file -> file.name == "TypeConversion.kt" }.readText()
+        assertTrue(conversionsCode.contains("unsafeCast<Float>"), "Float values must be cast via unsafeCast<Float>")
+    }
+
+    @Test
+    fun `should cast Short map values with unsafeCast`() {
+        val source =
+            SourceFile.kotlin(
+                "CollectionService.kt",
+                """
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
+
+                @JsExportClass
+                class CollectionService {
+                    fun process(payload: Map<String, Short>): Map<String, Short> = payload
+                }
+                """.trimIndent(),
+            )
+
+        val conversionsCode = compile(source).single { file -> file.name == "TypeConversion.kt" }.readText()
+        assertTrue(conversionsCode.contains("unsafeCast<Short>"), "Short values must be cast via unsafeCast<Short>")
+    }
+
+    @Test
+    fun `should cast Byte map values with unsafeCast`() {
+        val source =
+            SourceFile.kotlin(
+                "CollectionService.kt",
+                """
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
+
+                @JsExportClass
+                class CollectionService {
+                    fun process(payload: Map<String, Byte>): Map<String, Byte> = payload
+                }
+                """.trimIndent(),
+            )
+
+        val conversionsCode = compile(source).single { file -> file.name == "TypeConversion.kt" }.readText()
+        assertTrue(conversionsCode.contains("unsafeCast<Byte>"), "Byte values must be cast via unsafeCast<Byte>")
+    }
+
+    @Test
+    fun `should cast Boolean map values with unsafeCast`() {
+        val source =
+            SourceFile.kotlin(
+                "CollectionService.kt",
+                """
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
+
+                @JsExportClass
+                class CollectionService {
+                    fun process(payload: Map<String, Boolean>): Map<String, Boolean> = payload
+                }
+                """.trimIndent(),
+            )
+
+        val conversionsCode = compile(source).single { file -> file.name == "TypeConversion.kt" }.readText()
+        assertTrue(conversionsCode.contains("unsafeCast<Boolean>"), "Boolean values must be cast via unsafeCast<Boolean>")
+    }
+
+    @Test
+    fun `should cast nullable map values with a nullable unsafeCast`() {
+        val source =
+            SourceFile.kotlin(
+                "CollectionService.kt",
+                """
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
+
+                @JsExportClass
+                class CollectionService {
+                    fun process(payload: Map<String, Int?>): Map<String, Int?> = payload
+                }
+                """.trimIndent(),
+            )
+
+        val conversionsCode = compile(source).single { file -> file.name == "TypeConversion.kt" }.readText()
+        assertTrue(
+            conversionsCode.contains("unsafeCast<Int?>"),
+            "A nullable value type must keep the nullability marker in the unsafeCast target",
+        )
+    }
+
+    @Test
+    fun `should cast a non-primitive map value to its qualified type`() {
+        val source =
+            SourceFile.kotlin(
+                "CollectionService.kt",
+                """
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
+
+                data class Payload(val label: String)
+
+                @JsExportClass
+                class CollectionService {
+                    fun process(payload: Map<String, Payload>): Map<String, Payload> = payload
+                }
+                """.trimIndent(),
+            )
+
+        val conversionsCode = compile(source).single { file -> file.name == "TypeConversion.kt" }.readText()
+        assertTrue(
+            conversionsCode.contains("unsafeCast<Payload>"),
+            "A non-primitive value falls through to the else branch and is cast to its qualified name",
+        )
+    }
 }

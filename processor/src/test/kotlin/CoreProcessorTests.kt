@@ -196,6 +196,33 @@ class CoreProcessorTests : BaseProcessorTest() {
     }
 
     @Test
+    fun `should instantiate service with multiple required dependencies separated by commas`() {
+        val source =
+            SourceFile.kotlin(
+                "MultiDepService.kt",
+                """
+                package com.example
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
+
+                class HttpClient
+                class Logger
+
+                @JsExportClass
+                class MultiDepService(private val client: HttpClient, private val logger: Logger) {
+                    fun ping(): String = "ok"
+                }
+                """.trimIndent(),
+            )
+
+        val wrapperCode = compile(source).single { file -> file.name == "MultiDepServiceJs.kt" }.readText()
+
+        assertTrue(
+            wrapperCode.contains("MultiDepService(client = HttpClient(), logger = Logger())"),
+            "Multiple required dependencies should be comma-separated in the service initializer",
+        )
+    }
+
+    @Test
     fun `should omit constructor parameters that declare a default value`() {
         val source =
             SourceFile.kotlin(

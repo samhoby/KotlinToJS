@@ -1,11 +1,82 @@
 import com.tschuchort.compiletesting.SourceFile
-import org.junit.jupiter.api.Test
 import io.github.samhoby.kotlintojs.tests.BaseProcessorTest
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class IntegratedTests : BaseProcessorTest() {
     private val bigint = mapOf("longAsBigInt" to "true")
+
+    @Test
+    fun `should generate every conversion for the complete README example`() {
+        val source =
+            SourceFile.kotlin(
+                "CatalogService.kt",
+                $$"""
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
+                import io.github.samhoby.kotlintojs.annotations.JsExportFunction
+                import kotlinx.coroutines.Dispatchers
+                import kotlinx.coroutines.withContext
+
+                @JvmInline
+                value class UserId(val value: String)
+
+                @JsExportClass
+                class CatalogService {
+                    fun count(): Int = 0
+                    fun tags(): List<String> = listOf("a", "b")
+                    fun prices(): Map<String, Int> = mapOf("apple" to 3)
+                    fun total(): Long = 42L
+                    fun owner(id: UserId): String = id.value
+                    suspend fun search(q: String): List<String> =
+                        withContext(Dispatchers.Default) { listOf(q) }
+                }
+
+                @JsExportFunction
+                fun greet(name: String): String = "Hello, $name"
+                """.trimIndent(),
+            )
+
+        val files = compileWithOptions(listOf(source), bigint)
+        val wrapper = files.single { file -> file.name == "CatalogServiceJs.kt" }.readText()
+        val utils = files.single { file -> file.name == "JsExportUtils.kt" }.readText()
+        val conversions = files.single { file -> file.name == "TypeConversion.kt" }.readText()
+
+        assertTrue(wrapper.contains("private val service: CatalogService = CatalogService()"))
+        assertTrue(wrapper.contains("private val scope: CoroutineScope = MainScope()"))
+
+        assertTrue(wrapper.contains("fun count(): Int = service.count()"), "Int should pass through unchanged")
+
+        assertTrue(
+            wrapper.contains("fun tags(): Array<String> = service.tags().toTypedArray()"),
+            "List<String> should be exposed as Array<String>",
+        )
+
+        assertTrue(
+            wrapper.contains("fun prices(): Json = (service.prices()).toJson1()"),
+            "Map return should be encoded to Json via toJson1()",
+        )
+        assertTrue(wrapper.contains("fun total(): Long = service.total()"), "Long should pass through in BigInt mode")
+        assertTrue(
+            wrapper.contains("fun owner(id: String): String = service.owner(UserId(id))"),
+            "Value class parameter should be unwrapped to String and re-wrapped as UserId(id)",
+        )
+        assertTrue(
+            wrapper.contains("fun search(q: String): Promise<Array<String>> ="),
+            "Suspend List<String> return should become Promise<Array<String>>",
+        )
+        assertTrue(wrapper.contains("scope.promise { service.search(q).toTypedArray() }"))
+
+        assertTrue(wrapper.contains("import kotlin.js.Json"))
+        assertTrue(wrapper.contains("import kotlinx.coroutines.promise"))
+        assertTrue(wrapper.contains("import kotlintojs.generated.toJson1"))
+
+        assertTrue(utils.contains("object JsExportUtils"))
+        assertTrue(utils.contains("fun greet(name: String): String = greet(name)"))
+
+        assertTrue(conversions.contains("fun Json.toMap1()"))
+        assertTrue(conversions.contains("fun Map<String, Int>.toJson1(): Json"))
+    }
 
     @Test
     fun `should combine collections long and suspend mappings in one wrapper`() {
@@ -86,7 +157,11 @@ class IntegratedTests : BaseProcessorTest() {
         val generatedFiles = compileWithOptions(listOf(collectionsFile, suspendFile), bigint)
 
         val conversionFiles = generatedFiles.filter { file -> file.name == "TypeConversion.kt" }
-        assertEquals(1, conversionFiles.size, "Should generate a single TypeConversion.kt regardless of how many map signatures appear")
+        assertEquals(
+            1,
+            conversionFiles.size,
+            "Should generate a single TypeConversion.kt regardless of how many map signatures appear",
+        )
 
         val collectionsWrapper = generatedFiles.single { file -> file.name == "CollectionsCoreServiceJs.kt" }.readText()
         assertTrue(collectionsWrapper.contains("payload: Json"))
