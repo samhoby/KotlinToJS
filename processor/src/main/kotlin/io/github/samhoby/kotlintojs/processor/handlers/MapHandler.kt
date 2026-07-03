@@ -3,7 +3,6 @@ package io.github.samhoby.kotlintojs.processor.handlers
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.KSType
-import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.ksp.toTypeName
@@ -15,6 +14,7 @@ import io.github.samhoby.kotlintojs.processor.isMap
 import io.github.samhoby.kotlintojs.processor.isSet
 import io.github.samhoby.kotlintojs.processor.isString
 import io.github.samhoby.kotlintojs.processor.keyType
+import io.github.samhoby.kotlintojs.processor.types.JsRuntimeNames
 import io.github.samhoby.kotlintojs.processor.types.TypeMapping
 import io.github.samhoby.kotlintojs.processor.valueType
 
@@ -53,7 +53,7 @@ internal class MapHandler(
         val decode = decodeName(type)
         val encode = encodeName(type)
         return TypeMapping(
-            jsTypeName = jsonClass,
+            jsTypeName = JsRuntimeNames.json,
             toKotlin = { name -> "$name.$decode()" },
             toJs = { expr -> "($expr).$encode()" },
             importsForToKotlin = listOf(decode),
@@ -67,10 +67,7 @@ internal class MapHandler(
      */
     fun generateTypeConversion(codeGenerator: CodeGenerator) {
         if (!hasMapType) return
-        val fileSpecBuilder =
-            FileSpec
-                .builder("kotlintojs.generated", "TypeConversion")
-                .addImport("kotlin.js", "Json")
+        val fileSpecBuilder = FileSpec.builder("kotlintojs.generated", "TypeConversion")
 
         conversions.values.forEach { (decodeSpec, encodeSpec) ->
             fileSpecBuilder.addFunction(decodeSpec)
@@ -107,7 +104,7 @@ internal class MapHandler(
     private fun buildDecodeSpec(mapType: KSType): FunSpec {
         val keyType = mapType.keyType
         val valueType = mapType.valueType
-        val builder = FunSpec.builder(decodeName(mapType)).receiver(jsonClass).returns(mapType.toTypeName())
+        val builder = FunSpec.builder(decodeName(mapType)).receiver(JsRuntimeNames.json).returns(mapType.toTypeName())
         if (keyType.isString) {
             builder.addStatement(
                 "return js(%S).unsafeCast<Array<String>>().associateWith { %L }",
@@ -130,7 +127,7 @@ internal class MapHandler(
         FunSpec
             .builder(encodeName(mapType))
             .receiver(mapType.toTypeName())
-            .returns(jsonClass)
+            .returns(JsRuntimeNames.json)
             .beginControlFlow("return entries.fold(js(%S)) { acc, (k, v) ->", "{}")
             .addStatement(
                 "acc.asDynamic()[%L] = %L",
@@ -282,8 +279,4 @@ internal class MapHandler(
 
     /** Name of the `Map` extension that encodes this map type, e.g. `toJson1`. */
     private fun encodeName(mapType: KSType): String = "toJson${getIdFor(mapType)}"
-
-    companion object {
-        val jsonClass = ClassName("kotlin.js", "Json")
-    }
 }

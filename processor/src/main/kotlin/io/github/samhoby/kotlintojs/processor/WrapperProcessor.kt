@@ -24,6 +24,7 @@ import io.github.samhoby.kotlintojs.processor.handlers.ManglingHandler
 import io.github.samhoby.kotlintojs.processor.handlers.MapHandler
 import io.github.samhoby.kotlintojs.processor.handlers.SuspendHandler
 import io.github.samhoby.kotlintojs.processor.handlers.ValueClassHandler
+import io.github.samhoby.kotlintojs.processor.types.JsRuntimeNames
 import io.github.samhoby.kotlintojs.processor.types.Replacement
 import io.github.samhoby.kotlintojs.processor.types.TypeMapping
 
@@ -221,13 +222,7 @@ class WrapperProcessor(
             )
         }
 
-        val fileSpec =
-            FileSpec
-                .builder(serviceClass.packageName.asString(), wrapperName)
-                .apply {
-                    if (pendingConversionImports.isNotEmpty()) addImport("kotlin.js", "Json")
-                    if (SuspendHandler.needsScope(functions)) addImport("kotlinx.coroutines", "promise")
-                }
+        val fileSpec = FileSpec.builder(serviceClass.packageName.asString(), wrapperName)
 
         writeFile(fileSpec, classBuilder)
     }
@@ -286,13 +281,7 @@ class WrapperProcessor(
             )
         }
 
-        val fileSpec =
-            FileSpec
-                .builder("", wrapperName)
-                .apply {
-                    if (pendingConversionImports.isNotEmpty()) addImport("kotlin.js", "Json")
-                    if (SuspendHandler.needsScope(functions)) addImport("kotlinx.coroutines", "promise")
-                }
+        val fileSpec = FileSpec.builder("", wrapperName)
 
         writeFile(fileSpec, classBuilder)
     }
@@ -304,11 +293,11 @@ class WrapperProcessor(
     private fun jsExportObjectBuilder(name: String): TypeSpec.Builder =
         TypeSpec
             .objectBuilder(name)
-            .addAnnotation(ClassName("kotlin.js", "JsExport"))
+            .addAnnotation(JsRuntimeNames.jsExport)
             .addAnnotation(
                 AnnotationSpec
-                    .builder(ClassName("kotlin", "OptIn"))
-                    .addMember("%T::class", ClassName("kotlin.js", "ExperimentalJsExport"))
+                    .builder(JsRuntimeNames.optIn)
+                    .addMember("%T::class", JsRuntimeNames.experimentalJsExport)
                     .build(),
             )
 
@@ -323,8 +312,8 @@ class WrapperProcessor(
         if (SuspendHandler.needsScope(functions)) {
             builder.addProperty(
                 PropertySpec
-                    .builder("scope", ClassName("kotlinx.coroutines", "CoroutineScope"), KModifier.PRIVATE)
-                    .initializer("%T()", ClassName("kotlinx.coroutines", "MainScope"))
+                    .builder("scope", JsRuntimeNames.coroutineScope, KModifier.PRIVATE)
+                    .initializer("%T()", JsRuntimeNames.mainScope)
                     .build(),
             )
         }
@@ -391,15 +380,19 @@ class WrapperProcessor(
             }
 
         val call = buildCall(args)
-        val body =
-            if (isSuspend) SuspendHandler.buildBody(call, returnMapping) else "return ${returnMapping.toJs(call)}"
+        val funSpecBuilder =
+            FunSpec
+                .builder(ManglingHandler.getExportedName(func))
+                .addParameters(leadingParams + params)
+                .returns(finalReturn)
 
-        return FunSpec
-            .builder(ManglingHandler.getExportedName(func))
-            .addParameters(leadingParams + params)
-            .returns(finalReturn)
-            .addStatement(body)
-            .build()
+        if (isSuspend) {
+            SuspendHandler.addBody(funSpecBuilder, call, returnMapping)
+        } else {
+            funSpecBuilder.addStatement("return %L", returnMapping.toJs(call))
+        }
+
+        return funSpecBuilder.build()
     }
 
     /**

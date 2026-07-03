@@ -9,6 +9,7 @@ import io.github.samhoby.kotlintojs.processor.isList
 import io.github.samhoby.kotlintojs.processor.isLong
 import io.github.samhoby.kotlintojs.processor.isMap
 import io.github.samhoby.kotlintojs.processor.isSet
+import io.github.samhoby.kotlintojs.processor.types.JsRuntimeNames
 import io.github.samhoby.kotlintojs.processor.types.TypeMapping
 
 /**
@@ -118,7 +119,7 @@ internal class CollectionHandler(
             }
 
             type.isMap -> {
-                MapHandler.jsonClass
+                JsRuntimeNames.json
             }
 
             type.isLong -> {

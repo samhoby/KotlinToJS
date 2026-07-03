@@ -20,6 +20,12 @@ dependencies {
     kover(project(":processor"))
 }
 
+allprojects {
+    dependencyLocking {
+        lockAllConfigurations()
+    }
+}
+
 subprojects {
     group = "io.github.samhoby"
 }

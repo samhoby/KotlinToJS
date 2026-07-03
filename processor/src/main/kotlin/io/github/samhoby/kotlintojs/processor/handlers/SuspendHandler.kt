@@ -2,9 +2,10 @@ package io.github.samhoby.kotlintojs.processor.handlers
 
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.Modifier
-import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.TypeName
+import io.github.samhoby.kotlintojs.processor.types.JsRuntimeNames
 import io.github.samhoby.kotlintojs.processor.types.TypeMapping
 
 /**
@@ -16,18 +17,20 @@ import io.github.samhoby.kotlintojs.processor.types.TypeMapping
  * generated wrapper when at least one suspend function is present.
  */
 internal object SuspendHandler {
-    private val promiseClass = ClassName("kotlin.js", "Promise")
-
     /** Returns true if any function in [functions] is a suspend function, indicating a `CoroutineScope` is needed. */
     fun needsScope(functions: List<KSFunctionDeclaration>): Boolean =
         functions.any { function -> function.modifiers.contains(Modifier.SUSPEND) }
 
     /** Wraps the resolved return [TypeName] inside `Promise<T>` for the JS boundary. */
-    fun buildReturnType(mapping: TypeMapping): TypeName = promiseClass.parameterizedBy(mapping.jsTypeName)
+    fun buildReturnType(mapping: TypeMapping): TypeName = JsRuntimeNames.promiseClass.parameterizedBy(mapping.jsTypeName)
 
-    /** Builds the function body string that delegates to `scope.promise { }` and applies the return conversion. */
-    fun buildBody(
+    /**
+     * Appends the `return scope.promise { ... }` statement to [builder], referencing the `promise`
+     * extension via `%M` so KotlinPoet resolves the `kotlinx.coroutines` import itself.
+     */
+    fun addBody(
+        builder: FunSpec.Builder,
         call: String,
         returnMapping: TypeMapping,
-    ): String = "return scope.promise { ${returnMapping.toJs(call)} }"
+    ): FunSpec.Builder = builder.addStatement("return scope.%M { %L }", JsRuntimeNames.promise, returnMapping.toJs(call))
 }
