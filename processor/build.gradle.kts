@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.vanniktech.maven.publish)
+    id("org.jetbrains.kotlinx.kover")
 }
 
 version = "0.1.1"
