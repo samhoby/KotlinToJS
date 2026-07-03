@@ -4,8 +4,7 @@
 
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=samhoby_KotlinToJS&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=samhoby_KotlinToJS)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=samhoby_KotlinToJS&metric=coverage)](https://sonarcloud.io/summary/new_code?id=samhoby_KotlinToJS)
-[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=samhoby_KotlinToJS&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=samhoby_KotlinToJS)
-[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=samhoby_KotlinToJS&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=samhoby_KotlinToJS)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=samhoby_KotlinToJS&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=samhoby_KotlinToJS)
 
 A KSP processor for Kotlin Multiplatform projects with a JavaScript target.
 
@@ -20,16 +19,16 @@ processor generates the conversion layer. Your Kotlin code stays unchanged.
 
 ## Table Of Contents
 
+- [Getting Started](#getting-started)
+    - [Installation](#installation)
+    - [Where does generated code go?](#where-does-generated-code-go)
+    - [Full example setup](#full-example-setup)
 - [Usage](#usage)
     - [The example we build on](#the-example-we-build-on)
     - [What the processor generates](#what-the-processor-generates)
     - [Consuming it from JavaScript](#consuming-it-from-javascript)
     - [Custom type replacement](#custom-type-replacement)
     - [@JsExportClass vs @JsExport](#jsexportclass-vs-jsexport)
-- [Getting Started](#getting-started)
-    - [Installation](#installation)
-    - [Where does generated code go?](#where-does-generated-code-go)
-    - [Full example setup](#full-example-setup)
 - [Limitations](#limitations)
     - [Collections](#collections)
     - [Long](#long)
@@ -41,6 +40,95 @@ processor generates the conversion layer. Your Kotlin code stays unchanged.
     - [Sealed classes](#sealed-classes)
     - [Code mangling](#code-mangling)
     - [Suspended functions](#suspended-functions)
+
+---
+
+## Getting Started
+
+### Installation
+
+Apply the `io.github.samhoby.kotlintojs` plugin. It automatically applies KSP and wires the annotations and processor:
+
+```kotlin
+// build.gradle.kts
+plugins {
+    kotlin("multiplatform") version "2.1.0"
+    id("io.github.samhoby.kotlintojs") version "0.1.0"
+}
+
+kotlin {
+    js(IR) {
+        browser()   // or nodejs
+        binaries.executable()
+    }
+    // your other targets here, such as jvm or iosArm64
+
+    sourceSets {
+        commonMain.dependencies {
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+        }
+    }
+}
+```
+
+> The plugin pulls in the matching `annotations` and `processor` artifacts for you and wires the
+> processor to `kspJs`. You do not add them to your dependencies by hand. They resolve from Maven
+> Central, so keep `mavenCentral()` in your repositories.
+
+The plugin ships as **two artefacts**:
+
+| Artifact                        | What it is                                                                                 | Where it goes                         |
+|---------------------------------|--------------------------------------------------------------------------------------------|---------------------------------------|
+| `io.github.samhoby:annotations` | The `@JsExportClass` / `@JsExportFunction` annotations, multiplatform for jvm, js, and ios | `commonMain` or `jsMain` dependencies |
+| `io.github.samhoby:processor`   | The KSP processor that generates the wrappers, JVM only                                    | `add("kspJs", ...)`                   |
+
+The `@JsExportClass` and `@JsExportFunction` annotations can be placed in `commonMain` or `jsMain`. The processor runs
+for the JS compilation regardless of where the annotations are placed.
+
+### Where does generated code go?
+
+KSP writes the generated `.kt` files to `build/generated/ksp/` and **adds that directory to the JS compilation source
+set**. You do not need to configure any `srcDir`.
+
+After `./gradlew build`, find the generated wrappers at:
+
+```
+build/generated/ksp/js/jsMain/kotlin/
+```
+
+IntelliJ IDEA and Android Studio index this directory, so **Go to Declaration** and **Find Usages** navigate into
+generated files.
+
+> If the IDE does not pick up the directory, add it to `jsMain`:
+> ```kotlin
+> kotlin {
+>     sourceSets {
+>         jsMain { kotlin.srcDir("build/generated/ksp/js/jsMain/kotlin") }
+>     }
+> }
+> ```
+
+### Full example setup
+
+**With the Gradle Plugin:**
+
+```kotlin
+// build.gradle.kts
+plugins {
+    kotlin("multiplatform") version "2.1.0"
+    id("io.github.samhoby.kotlintojs") version "0.1.0"
+}
+
+kotlin {
+    js(IR) {
+        browser() // or nodejs
+        binaries.executable()
+
+        // Optional: Required only if you expose `Long` and want native JS BigInt
+        compilerOptions { freeCompilerArgs.add("-Xes-long-as-bigint") }
+    }
+}
+```
 
 ---
 
@@ -319,95 +407,6 @@ types require manual conversion. With this plugin, annotating with `@JsExportCla
 | Suspend functions       | Manual `Promise` wrapping required              | Automatic                                                                                  |
 | Code mangling           | Manual `@JsName` everywhere                     | Conflict detection plus `@JsName` passthrough                                              |
 | Sealed / union types    | Mangled subclass names, unusable from TS        | Declare a JS-friendly stand-in with `@JsExportReplacement` + `@JsExportConverter`          |
-
----
-
-## Getting Started
-
-### Installation
-
-Apply the `io.github.samhoby.kotlintojs` plugin. It automatically applies KSP and wires the annotations and processor:
-
-```kotlin
-// build.gradle.kts
-plugins {
-    kotlin("multiplatform") version "2.1.0"
-    id("io.github.samhoby.kotlintojs") version "0.1.0"
-}
-
-kotlin {
-    js(IR) {
-        browser()   // or nodejs
-        binaries.executable()
-    }
-    // your other targets here, such as jvm or iosArm64
-
-    sourceSets {
-        commonMain.dependencies {
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
-        }
-    }
-}
-```
-
-> The plugin pulls in the matching `annotations` and `processor` artifacts for you and wires the
-> processor to `kspJs`. You do not add them to your dependencies by hand. They resolve from Maven
-> Central, so keep `mavenCentral()` in your repositories.
-
-The plugin ships as **two artefacts**:
-
-| Artifact                        | What it is                                                                                 | Where it goes                         |
-|---------------------------------|--------------------------------------------------------------------------------------------|---------------------------------------|
-| `io.github.samhoby:annotations` | The `@JsExportClass` / `@JsExportFunction` annotations, multiplatform for jvm, js, and ios | `commonMain` or `jsMain` dependencies |
-| `io.github.samhoby:processor`   | The KSP processor that generates the wrappers, JVM only                                    | `add("kspJs", ...)`                   |
-
-The `@JsExportClass` and `@JsExportFunction` annotations can be placed in `commonMain` or `jsMain`. The processor runs
-for the JS compilation regardless of where the annotations are placed.
-
-### Where does generated code go?
-
-KSP writes the generated `.kt` files to `build/generated/ksp/` and **adds that directory to the JS compilation source
-set**. You do not need to configure any `srcDir`.
-
-After `./gradlew build`, find the generated wrappers at:
-
-```
-build/generated/ksp/js/jsMain/kotlin/
-```
-
-IntelliJ IDEA and Android Studio index this directory, so **Go to Declaration** and **Find Usages** navigate into
-generated files.
-
-> If the IDE does not pick up the directory, add it to `jsMain`:
-> ```kotlin
-> kotlin {
->     sourceSets {
->         jsMain { kotlin.srcDir("build/generated/ksp/js/jsMain/kotlin") }
->     }
-> }
-> ```
-
-### Full example setup
-
-**With the Gradle Plugin:**
-
-```kotlin
-// build.gradle.kts
-plugins {
-    kotlin("multiplatform") version "2.1.0"
-    id("io.github.samhoby.kotlintojs") version "0.1.0"
-}
-
-kotlin {
-    js(IR) {
-        browser() // or nodejs
-        binaries.executable()
-
-        // Optional: Required only if you expose `Long` and want native JS BigInt
-        compilerOptions { freeCompilerArgs.add("-Xes-long-as-bigint") }
-    }
-}
-```
 
 ---
 
