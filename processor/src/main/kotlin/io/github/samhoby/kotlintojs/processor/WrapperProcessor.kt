@@ -176,10 +176,11 @@ class WrapperProcessor(
         pendingImports.clear()
         pendingConversionImports.clear()
         val wrapperName = "${serviceClass.simpleName.asString()}Js"
+        val originalName = serviceClass.simpleName.asString()
         val isObject = serviceClass.classKind == ClassKind.OBJECT
         val isValueClass = Modifier.VALUE in serviceClass.modifiers
 
-        val classBuilder = jsExportObjectBuilder(wrapperName)
+        val classBuilder = jsExportObjectBuilder(wrapperName, originalName)
 
         if (!isValueClass) {
             val initializer =
@@ -289,11 +290,22 @@ class WrapperProcessor(
     /**
      * Creates the base `@JsExport object` builder with the mandatory
      * `@OptIn(ExperimentalJsExport::class)` opt-in, shared by every generated wrapper.
+     * Also adds a `@JsName` annotation to export the wrapper with its original name.
      */
-    private fun jsExportObjectBuilder(name: String): TypeSpec.Builder =
+    private fun jsExportObjectBuilder(name: String, originalName: String? = null): TypeSpec.Builder =
         TypeSpec
             .objectBuilder(name)
             .addAnnotation(JsRuntimeNames.jsExport)
+            .apply {
+                if (originalName != null) {
+                    addAnnotation(
+                        AnnotationSpec
+                            .builder(ClassName("kotlin.js", "JsName"))
+                            .addMember("%S", originalName)
+                            .build(),
+                    )
+                }
+            }
             .addAnnotation(
                 AnnotationSpec
                     .builder(JsRuntimeNames.optIn)
