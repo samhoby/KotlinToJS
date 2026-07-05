@@ -4,7 +4,7 @@ plugins {
     id("org.jetbrains.kotlinx.kover")
 }
 
-version = "0.1.2"
+version = "0.1.3"
 
 dependencies {
     implementation(project(":annotations"))

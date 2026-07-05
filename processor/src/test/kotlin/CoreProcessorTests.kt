@@ -30,6 +30,31 @@ class CoreProcessorTests : BaseProcessorTest() {
     }
 
     @Test
+    fun `should annotate wrapper object with JsName of the original class name`() {
+        val source =
+            SourceFile.kotlin(
+                "CoreService.kt",
+                """
+                import io.github.samhoby.kotlintojs.annotations.JsExportClass
+
+                @JsExportClass
+                class CoreService {
+                    fun example(): String = "ok"
+                }
+                """.trimIndent(),
+            )
+
+        val files = compile(source)
+        val wrapperCode = files.single { file -> file.name == "CoreServiceJs.kt" }.readText()
+
+        assertTrue(
+            wrapperCode.contains("@JsName(\"CoreService\")"),
+            "Wrapper object should carry @JsName with the original class name so JS uses it. Actual:\n$wrapperCode",
+        )
+        assertTrue(wrapperCode.contains("object CoreServiceJs"), "Kotlin object name should keep the Js suffix")
+    }
+
+    @Test
     fun `should handle object class kind`() {
         val source =
             SourceFile.kotlin(
