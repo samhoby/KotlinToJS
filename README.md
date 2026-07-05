@@ -53,7 +53,7 @@ Apply the `io.github.samhoby.kotlintojs` plugin. It automatically applies KSP an
 // build.gradle.kts
 plugins {
     kotlin("multiplatform") version "2.1.0"
-    id("io.github.samhoby.kotlintojs") version "0.1.0"
+    id("io.github.samhoby.kotlintojs") version "0.1.3"
 }
 
 kotlin {
@@ -116,7 +116,7 @@ generated files.
 // build.gradle.kts
 plugins {
     kotlin("multiplatform") version "2.1.0"
-    id("io.github.samhoby.kotlintojs") version "0.1.0"
+    id("io.github.samhoby.kotlintojs") version "0.1.3"
 }
 
 kotlin {
