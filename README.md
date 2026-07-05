@@ -217,12 +217,15 @@ fun apiVersion(): String = "1.0.0"
 
 For `UserAPI`, the processor generates `UserAPIJs.kt`. Every `suspend` becomes a `Promise`,
 `Either` becomes `JsEither` (see [Custom type replacement](#custom-type-replacement)), `List`
-becomes `Array`, `Map` becomes `Json`, and the source class keeps no JS annotations:
+becomes `Array`, `Map` becomes `Json`, and the source class keeps no JS annotations. The wrapper
+object carries `@JsName("UserAPI")`, so JavaScript consumes it under the **original class name**
+(`UserAPI`), not the internal `UserAPIJs` name:
 
 ```kotlin
 // build/generated/ksp/js/jsMain/kotlin/UserAPIJs.kt
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+import kotlin.js.JsName
 import kotlin.js.Json
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
@@ -230,6 +233,7 @@ import kotlinx.coroutines.promise
 import kotlintojs.generated.toJson1
 
 @JsExport
+@JsName("UserAPI")
 @OptIn(ExperimentalJsExport::class)
 object UserAPIJs {
     private val service: UserAPI = UserAPI(httpClient = SharedHttpClient())
@@ -295,21 +299,25 @@ object JsExportUtils {
 
 ### Consuming it from JavaScript
 
-`Long` parameters are passed as `BigInt` literals, `Promise`s are awaited, and `JsEither` exposes a
-flat `success` / `data` / `error` shape:
+The wrapper is reached under the original class name (`UserAPI`), `Long` parameters are passed as
+`BigInt` literals, `Promise`s are awaited, and `JsEither` exposes a flat `success` / `data` /
+`error` shape:
 
 ```js
-const res = await UserAPIJs.getUserById(1n)
+const res = await UserAPI.getUserById(1n)
 if (res.success) {
     console.log(res.data)    // UserOutputModel
 } else {
     console.error(res.error) // ProblemDetail
 }
 
-const names = await UserAPIJs.getUserNames()       // string[]
-const flags = await UserAPIJs.getExpertiseFlags()  // { "1": true, "2": false }
+const names = await UserAPI.getUserNames()       // string[]
+const flags = await UserAPI.getExpertiseFlags()  // { "1": true, "2": false }
 const ver = JsExportUtils.apiVersion()           // "1.0.0"
 ```
+
+> Standalone `@JsExportFunction` declarations are still reached through the `JsExportUtils` object,
+> which keeps its own name.
 
 Full behaviour of each conversion is documented in [Limitations](#limitations).
 
@@ -405,6 +413,7 @@ types require manual conversion. With this plugin, annotating with `@JsExportCla
 | `Long`                  | Unusable opaque JS object, or precision loss    | Warning plus `Double` fallback, or opt-in native BigInt passthrough                        |
 | Value classes           | Opaque wrapper exposed to JS                    | Unwrap to underlying type, or annotate the value class directly for static method wrappers |
 | Suspend functions       | Manual `Promise` wrapping required              | Automatic                                                                                  |
+| Exported JS name        | Whatever you name the exported declaration      | Wrapper carries `@JsName`, so JS uses the original class name (`UserAPI`, not `UserAPIJs`)  |
 | Code mangling           | Manual `@JsName` everywhere                     | Conflict detection plus `@JsName` passthrough                                              |
 | Sealed / union types    | Mangled subclass names, unusable from TS        | Declare a JS-friendly stand-in with `@JsExportReplacement` + `@JsExportConverter`          |
 
@@ -594,14 +603,16 @@ Generated:
 
 ```kotlin
 @JsExport
+@JsName("UserId")
 @OptIn(ExperimentalJsExport::class)
 object UserIdJs {
     fun isAdmin(userId: Long): Boolean = UserId(userId).isAdmin()
 }
 ```
 
-The first parameter is named after the class, lower-camel-cased. JS callers invoke
-`UserIdJs.isAdmin(1n)` without constructing a Kotlin `UserId`.
+The first parameter is named after the class, lower-camel-cased. Because the wrapper carries
+`@JsName("UserId")`, JS callers invoke `UserId.isAdmin(1n)` under the original class name, without
+constructing a Kotlin `UserId`.
 
 Type conversions on the underlying property compose in both scenarios. `UserId(val value: Long)` in
 BigInt mode exposes `Long` at the boundary; a `value class Price(val cents: Int)` would expose `Int`.
@@ -841,6 +852,7 @@ promise body:
 
 ```kotlin
 @JsExport
+@JsName("UserAPI")
 @OptIn(ExperimentalJsExport::class)
 object UserAPIJs {
     private val service: UserAPI = UserAPI(httpClient = SharedHttpClient())
@@ -854,9 +866,9 @@ object UserAPIJs {
 }
 ```
 
-From JavaScript:
+From JavaScript (reached under the original class name):
 
 ```js
-const user = await UserAPIJs.getUserById(1n)  // JsEither<ProblemDetail, UserOutputModel>
-const names = await UserAPIJs.getUserNames()   // string[]
+const user = await UserAPI.getUserById(1n)  // JsEither<ProblemDetail, UserOutputModel>
+const names = await UserAPI.getUserNames()   // string[]
 ```
